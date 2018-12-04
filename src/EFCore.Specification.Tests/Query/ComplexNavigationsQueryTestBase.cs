@@ -170,9 +170,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 l1s => l1s.Where(
                     l => l.OneToOne_Required_FK1 == new Level2
-                         {
-                             Id = 1
-                         }
+                    {
+                        Id = 1
+                    }
                          || l.OneToOne_Required_FK1 == new Level2
                          {
                              Id = 2
@@ -192,9 +192,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 l2s => l2s.Where(
                     l => l.OneToOne_Required_FK_Inverse2 == new Level1
-                         {
-                             Id = 1
-                         }
+                    {
+                        Id = 1
+                    }
                          || l.OneToOne_Required_FK_Inverse2 == new Level1
                          {
                              Id = 2
@@ -1782,7 +1782,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         [MemberData(nameof(IsAsyncData))]
         public virtual Task Result_operator_nav_prop_reference_optional_Sum(bool isAsync)
         {
-            return AssertSum<Level1,Level1>(
+            return AssertSum<Level1, Level1>(
                 isAsync,
                 l1s => l1s,
                 l1s => l1s,
@@ -3149,7 +3149,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                {
                    Assert.Equal(e.l1.Id, a.l1.Id);
                    Assert.Equal(e.l2.Id, a.l2.Id);
-               }); 
+               });
         }
 
         [ConditionalTheory]
@@ -5353,7 +5353,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                     }).ToList()
                 }),
                 assertOrder: true,
-                elementAsserter: (e, a) => {
+                elementAsserter: (e, a) =>
+                {
                     CollectionAsserter<dynamic>(
                         elementSorter: e1 => e1.Level3.Name,
                         elementAsserter: (e1, a1) => Assert.Equal(e1.Level3.Name, a1.Level3.Name))(e.Level2s, a.Level2s);
@@ -5376,7 +5377,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                     }).ToList()
                 }),
                 assertOrder: true,
-                elementAsserter: (e, a) => {
+                elementAsserter: (e, a) =>
+                {
                     CollectionAsserter<dynamic>(
                         elementSorter: e1 => e1.Level3.Value,
                         elementAsserter: (e1, a1) => Assert.Equal(e1.Level3.Value, a1.Level3.Value))(e.Level2s, a.Level2s);
@@ -5428,6 +5430,116 @@ namespace Microsoft.EntityFrameworkCore.Query
 
                 Assert.True(result.All(r => r.l2.OneToMany_Required2 != null));
                 Assert.True(result.Any(r => r.OneToMany_Optional2.Count > 0));
+            }
+        }
+
+        public readonly struct TransparentIdentifier<TOuter, TInner>
+        {
+            public static TransparentIdentifier<TOuter, TInner> CreateTransparentIdentifier(TOuter outer, TInner inner)
+                => new TransparentIdentifier<TOuter, TInner>(outer, inner);
+
+            public TransparentIdentifier(TOuter outer, TInner inner)
+            {
+                Outer = outer;
+                Inner = inner;
+            }
+
+            public readonly TOuter Outer;
+
+            public readonly TInner Inner;
+        }
+
+        [ConditionalFact]
+        public virtual void Nav1()
+        {
+            using (var ctx = CreateContext())
+            {
+                //var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo").Where(l1 => l1.Id != 1);//.Select(l1 => l1.Id);
+
+                //var query = from l1 in ctx.LevelOne
+                //            join l2 in ctx.LevelTwo on l1.Id equals l2.Level1_Optional_Id into grouping
+                //            from l2 in grouping.DefaultIfEmpty()
+                //            where l2.Name != "Foo"
+                //            select l1.Id;
+
+
+                //var query = ctx.LevelOne.Select(c => c.OneToOne_Optional_PK1.OneToOne_Required_FK2.OneToMany_Optional3.Where(e => e.Id > 0)).ToList();
+
+
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                //    .OrderBy(x => x.foo.OneToOne_Optional_PK2.Id)
+                //    .Select(xx => new { bar = xx.foo.OneToOne_Optional_PK2 })
+                //    .Where(xxx => xxx.bar.OneToMany_Optional3.Count() > 0);
+
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    .Where(x => x.foo.OneToOne_Required_FK2.OneToMany_Optional3.Count() > 0);
+
+
+
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_FK2.Name != "Foo")
+                //    .Select(l1 => new { foo = new { bar = l1.OneToOne_Optional_FK1 } })
+                //    .Distinct()
+                //    .Where(x => x.foo.bar.OneToOne_Required_FK2.OneToOne_Optional_PK3.Name != "Bar");
+
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_FK2.Name != "Foo" && l1.OneToOne_Required_FK1.Name != "Foo")
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                //    .Select(x => new { bar = x.foo })
+                //    .Where(xx => xx.bar.OneToOne_Required_FK2.Id > 0)
+                //    .Distinct()
+                //    .Select(xxx => new { baz = xxx.bar.OneToOne_Required_FK2 })
+                //    .Where(xxxx => xxxx.baz.OneToOne_Required_FK3.Name != "Bar"); // need to remap again
+
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")    // l1 - Outer | l1.OneToOne_Optional_FK1 - Inner
+                //    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Bar")    // l1 - Outer.Outer | l1.OneToOne_Optional_FK1 - Outer.Inner | l1.OneToOne_Optional_PK1 - Inner
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_PK1 })   // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo
+                //    .Where(l2 => l2.foo.OneToOne_Optional_FK2.Name != "Baz"); // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo.Outer | l1.OneToOne_Optional_PK1.OneToOne_Optional_FK2 - foo.Inner
+
+
+
+
+                //var query = ctx.LevelOne.Select(c => new
+                //{
+                //    c = c,
+                //    Foo = new
+                //    {
+                //        Bar = c.OneToOne_Optional_PK1,
+                //        Baz = c.OneToOne_Optional_PK1.OneToOne_Required_FK2,
+                //    }
+                //})
+                //.Select(c2 => new
+                //{
+                //    c2 = c2.c,
+                //    Foo2 = new
+                //    {
+                //        Bar2 = c2.Foo.Bar.OneToOne_Required_FK2.OneToOne_Optional_Self3,
+                //        Baz2 = c2.Foo.Baz
+                //    }
+                //})
+                //.Where(r => r.Foo2.Bar2.OneToOne_Required_FK3.Name == r.Foo2.Baz2.OneToOne_Optional_FK_Inverse3.Name && r.c2.Name != "Foo");
+
+
+                //var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_PK2.Name != "Foo").Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2.OneToOne_Optional_PK3.Id > 0 );
+
+                //var query = ctx.LevelOne.Join(ctx.LevelTwo, l1 => (int?)l1.Id, l2 => l2.Level1_Optional_Id, (l1, l2) => TransparentIdentifier<Level1, Level2>.CreateTransparentIdentifier(l1, l2))
+                //    .Join(ctx.LevelThree, t => (int?)t.Inner.Id, l3 => l3.Level2_Optional_Id, (t, l3) => TransparentIdentifier<TransparentIdentifier<Level1, Level2>, Level3>.CreateTransparentIdentifier(t, l3));
+
+                //var query = ctx.LevelOne.Join(ctx.LevelTwo, l1 => (int?)l1.Id, l2 => l2.Level1_Optional_Id, (l1, l2) => new TransparentIdentifier<Level1, Level2>(l1, l2))
+                //    .Join(ctx.LevelThree, t => (int?)t.Inner.Id, l3 => l3.Level2_Optional_Id, (t, l3) => new TransparentIdentifier<TransparentIdentifier<Level1, Level2>, Level3>(t, l3));
+
+
+                //var query = from l1 in ctx.LevelOne
+                //            join l2 in ctx.LevelTwo on (int?)l1.Id equals EF.Property<int?>(l2, "Level1_Optional_Id")
+                //            join l3 in ctx.LevelThree on (int?)l2.Id equals EF.Property<int?>(l3, "Level2_Optional_Id")
+                //            where l3.Name != "Foo"
+                //            select l1;
+
+                var result = query.ToList();
             }
         }
     }

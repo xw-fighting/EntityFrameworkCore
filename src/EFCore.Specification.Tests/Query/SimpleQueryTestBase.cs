@@ -1497,6 +1497,30 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         [ConditionalFact]
+        public virtual void Select_DTO_constructor_distinct_with_navigation_translated_to_server()
+        {
+            using (var context = CreateContext())
+            {
+                var actual = context.Set<Order>()
+                    .Where(o => o.OrderID < 10300)
+                    .Select(o => new OrderCountDTO(o.Customer.City))
+                    .Distinct().ToList().OrderBy(e => e.Id).ToList();
+
+                var expected = Fixture.QueryAsserter.ExpectedData.Set<Order>()
+                    .Where(o => o.OrderID < 10300)
+                    .Select(o => new OrderCountDTO(o.Customer.City))
+                    .Distinct().ToList().OrderBy(e => e.Id).ToList();
+
+                Assert.Equal(expected.Count, actual.Count);
+                for (var i = 0; i < expected.Count; i++)
+                {
+                    Assert.Equal(expected[i].Id, actual[i].Id);
+                    Assert.Equal(expected[i].Count, actual[i].Count);
+                }
+            }
+        }
+
+        [ConditionalFact]
         public virtual void Select_DTO_with_member_init_distinct_translated_to_server()
         {
             using (var context = CreateContext())

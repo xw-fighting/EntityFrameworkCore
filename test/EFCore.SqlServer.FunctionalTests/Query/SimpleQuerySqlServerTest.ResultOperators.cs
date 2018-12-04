@@ -665,6 +665,17 @@ FROM [Customers] AS [c]
 WHERE [c].[CustomerID] = N'ALFKI'");
         }
 
+        public override async Task Where_FirstOrDefault(bool isAsync)
+        {
+            await base.Where_FirstOrDefault(isAsync);
+
+            AssertSql(
+                @"SELECT TOP(1) [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
+FROM [Customers] AS [c]
+WHERE [c].[City] = N'London'
+ORDER BY [c].[ContactName]");
+        }
+
         public override async Task FirstOrDefault_inside_subquery_gets_server_evaluated(bool isAsync)
         {
             await base.FirstOrDefault_inside_subquery_gets_server_evaluated(isAsync);
@@ -675,7 +686,7 @@ FROM [Customers] AS [c]
 WHERE ([c].[CustomerID] = N'ALFKI') AND ((
     SELECT TOP(1) [o].[CustomerID]
     FROM [Orders] AS [o]
-    WHERE ([o].[CustomerID] = N'ALFKI') AND ([c].[CustomerID] = [o].[CustomerID])
+    WHERE ([c].[CustomerID] = [o].[CustomerID]) AND ([o].[CustomerID] = N'ALFKI')
 ) = N'ALFKI')");
         }
 
@@ -692,7 +703,7 @@ WHERE [c].[CustomerID] = N'ALFKI'",
 
 SELECT TOP(1) [o0].[CustomerID]
 FROM [Orders] AS [o0]
-WHERE ([o0].[CustomerID] = N'ALFKI') AND (@_outer_CustomerID = [o0].[CustomerID])");
+WHERE (@_outer_CustomerID = [o0].[CustomerID]) AND ([o0].[CustomerID] = N'ALFKI')");
         }
 
         public override async Task Last(bool isAsync)

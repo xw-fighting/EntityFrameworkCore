@@ -313,6 +313,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 case ExpressionType.Throw:
                 case ExpressionType.Not:
                 case ExpressionType.TypeAs:
+                case ExpressionType.Quote:
                     VisitUnary((UnaryExpression)expression);
                     break;
 
@@ -797,7 +798,14 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
         {
             if (_parametersInScope.ContainsKey(parameterExpression))
             {
-                _stringBuilder.Append(_parametersInScope[parameterExpression]);
+                if (_parametersInScope[parameterExpression].Contains("."))
+                {
+                    _stringBuilder.Append("[" + _parametersInScope[parameterExpression] + "]");
+                }
+                else
+                {
+                    _stringBuilder.Append(_parametersInScope[parameterExpression]);
+                }
             }
             else
             {
@@ -847,6 +855,10 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                     _stringBuilder.Append("(");
                     Visit(unaryExpression.Operand);
                     _stringBuilder.Append(" as " + unaryExpression.Type.ShortDisplayName() + ")");
+                    break;
+
+                case ExpressionType.Quote:
+                    Visit(unaryExpression.Operand);
                     break;
 
                 default:
