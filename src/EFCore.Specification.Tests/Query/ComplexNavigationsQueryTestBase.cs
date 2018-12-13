@@ -170,9 +170,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 l1s => l1s.Where(
                     l => l.OneToOne_Required_FK1 == new Level2
-                         {
-                             Id = 1
-                         }
+                    {
+                        Id = 1
+                    }
                          || l.OneToOne_Required_FK1 == new Level2
                          {
                              Id = 2
@@ -192,9 +192,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 l2s => l2s.Where(
                     l => l.OneToOne_Required_FK_Inverse2 == new Level1
-                         {
-                             Id = 1
-                         }
+                    {
+                        Id = 1
+                    }
                          || l.OneToOne_Required_FK_Inverse2 == new Level1
                          {
                              Id = 2
@@ -1782,7 +1782,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         [MemberData(nameof(IsAsyncData))]
         public virtual Task Result_operator_nav_prop_reference_optional_Sum(bool isAsync)
         {
-            return AssertSum<Level1,Level1>(
+            return AssertSum<Level1, Level1>(
                 isAsync,
                 l1s => l1s,
                 l1s => l1s,
@@ -3149,7 +3149,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                {
                    Assert.Equal(e.l1.Id, a.l1.Id);
                    Assert.Equal(e.l2.Id, a.l2.Id);
-               }); 
+               });
         }
 
         [ConditionalTheory]
@@ -5353,7 +5353,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                     }).ToList()
                 }),
                 assertOrder: true,
-                elementAsserter: (e, a) => {
+                elementAsserter: (e, a) =>
+                {
                     CollectionAsserter<dynamic>(
                         elementSorter: e1 => e1.Level3.Name,
                         elementAsserter: (e1, a1) => Assert.Equal(e1.Level3.Name, a1.Level3.Name))(e.Level2s, a.Level2s);
@@ -5376,7 +5377,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                     }).ToList()
                 }),
                 assertOrder: true,
-                elementAsserter: (e, a) => {
+                elementAsserter: (e, a) =>
+                {
                     CollectionAsserter<dynamic>(
                         elementSorter: e1 => e1.Level3.Value,
                         elementAsserter: (e1, a1) => Assert.Equal(e1.Level3.Value, a1.Level3.Value))(e.Level2s, a.Level2s);
@@ -5461,7 +5463,10 @@ namespace Microsoft.EntityFrameworkCore.Query
                 //            select l1.Id;
 
 
-                var query = ctx.LevelOne.Select(c => new { Foo = new { Bar = c.OneToOne_Optional_PK1 } }).Where(r => r.Foo.Bar.OneToOne_Required_FK2.Name == "Foo");
+                var query = ctx.LevelOne.Select(c => c.OneToOne_Optional_PK1.OneToOne_Required_FK2.OneToMany_Optional3.Where(e => e.Id > 0)).ToList();
+
+
+                //var query = ctx.LevelOne.Select(c => new { Foo = new { Bar = c.OneToOne_Optional_PK1 } }).Where(r => r.Foo.Bar.OneToOne_Required_FK2.Name == "Foo");
 
 
                 //var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_PK2.Name != "Foo").Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2.OneToOne_Optional_PK3.Id > 0 );

@@ -4047,6 +4047,11 @@ ORDER BY [t0].[Id]");
                 @"");
         }
 
+        public override void Simulation()
+        {
+            base.Simulation();
+        }
+
         private void AssertSql(params string[] expected)
         {
             Fixture.TestSqlLoggerFactory.AssertBaseline(expected);

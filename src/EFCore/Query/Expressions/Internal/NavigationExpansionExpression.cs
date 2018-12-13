@@ -44,6 +44,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public List<(List<string> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
         public List<(List<string> from, List<INavigation> to)> SelectorMapping { get; }
+        public List<Expression> PreviousSelectors { get; }
 
         public List<NavigationPathNode> FoundNavigations { get; }
 
@@ -54,6 +55,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             ParameterExpression parameterExpression,
             List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping,
             List<(List<string> from, List<INavigation> to)> selectorMapping,
+            List<Expression> previousSelectors,
             List<NavigationPathNode> foundNavigations,
             List<string> finalProjectionPath,
             Type returnType)
@@ -62,6 +64,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             ParameterExpression = parameterExpression;
             TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
             SelectorMapping = selectorMapping;
+            PreviousSelectors = previousSelectors;
             FoundNavigations = foundNavigations;
             FinalProjectionPath = finalProjectionPath;
             _returnType = returnType;

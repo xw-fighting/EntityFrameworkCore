@@ -53,37 +53,53 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             return base.VisitMethodCall(methodCallExpression);
         }
 
-        protected override Expression VisitMember(MemberExpression memberExpression)
+        protected override Expression VisitExtension(Expression extensionExpression)
         {
-            if (memberExpression.Member.Name == nameof(ICollection<int>.Count)
-                && memberExpression.Member.DeclaringType.IsGenericType
-                && memberExpression.Member.DeclaringType.GetGenericTypeDefinition() == typeof(ICollection<>))
-            {
-                var newExpression = Visit(memberExpression.Expression);
-                if (newExpression != memberExpression.Expression)
-                {
-                    var countMethod = QueryableCount.MakeGenericMethod(newExpression.Type.GetGenericArguments()[0]);
-
-                    return Expression.Call(countMethod, newExpression);
-                }
-            }
-
-            var properties = Binder.GetPropertyPath(
-                memberExpression,
-                _model,
-                selectorMapping: new List<(List<string> from, List<INavigation> to)>(),
-                out var parameterExpression);
-
-            if (properties.Any()
-                && properties.All(p => p is INavigation)
-                && properties.Last() is INavigation navigation
+            if (extensionExpression is NavigationBindingExpression navigationBindingExpression
+                && navigationBindingExpression.Navigations.Last() is INavigation navigation
                 && navigation.IsCollection())
             {
                 var collectionNavigationElementType = navigation.ForeignKey.DeclaringEntityType.ClrType;
                 var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
+                // unwrap top level expression - since we are inside nav NavigationPropertyBindingExpression the top level will either be member expression or EF.Property
+                var outerExpression = (navigationBindingExpression.Operand as MemberExpression)?.Expression
+                    ?? (navigationBindingExpression.Operand as MethodCallExpression).Arguments[0];
+
+                var outerNavigationBinding = new NavigationBindingExpression(
+                    outerExpression,
+
+
+
+
+
+
+
+
+
+
+
+
+                    null,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    navigationBindingExpression.Root,
+                    navigationBindingExpression.Navigations.Take(navigationBindingExpression.Navigations.Count - 1));
+
                 var outerKeyAccess = CreateKeyAccessExpression(
-                    memberExpression.Expression,
+                    outerNavigationBinding,
                     navigation.ForeignKey.PrincipalKey.Properties);
 
                 var innerParameter = Expression.Parameter(collectionNavigationElementType, collectionNavigationElementType.Name.ToLower().Substring(0, 1));
@@ -95,9 +111,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                         outerKeyAccess,
                         innerKeyAccess,
-                        memberExpression.Expression,
-                        parameterExpression,
-                        properties.OfType<INavigation>()),
+                        outerNavigationBinding,
+                        navigationBindingExpression.Root,
+                        navigationBindingExpression.Navigations),
                     innerParameter);
 
                 return Expression.Call(
@@ -106,7 +122,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     predicate);
             }
 
-            return base.VisitMember(memberExpression);
+            return extensionExpression;
         }
 
         private static Expression CreateKeyAccessExpression(
