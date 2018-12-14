@@ -13,7 +13,6 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
-using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 {
@@ -46,95 +45,131 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     }
 
 
-
-
-
-
-
-
-
-    public class NavigationBindingExpression : Expression, IPrintable
+    public class NavigationPropertyBinder
     {
-        public NavigationBindingExpression(Expression operand, LambdaExpression operandLambda, Expression root, IEnumerable<INavigation> navigations)
+        // TODO: model should not be needed - entity type information will be embeded in the lambda
+        public static (Expression root, IReadOnlyList<INavigation> navigations) BindNavigationProperties(Expression expression, IModel model)
         {
-            Operand = operand;
-            OperandLambda = operandLambda;
-            Root = root;
-            Navigations = navigations.ToList().AsReadOnly();
+            var visitor = new NavigationPropertyBindingExpressionVisitor(model);
+            var result = visitor.Visit(expression);
+
+            return result is NavigationBindingExpression navigationBindingExpression
+                ? (source: navigationBindingExpression.Root, navigations: navigationBindingExpression.Navigations)
+                : (source: expression, navigations: new List<INavigation>().AsReadOnly());
         }
 
-        public Expression Operand { get; }
-
-        public LambdaExpression OperandLambda { get; }
-
-        public Expression Root { get; set; }
-        public IReadOnlyList<INavigation> Navigations { get; }
-
-        public override ExpressionType NodeType => ExpressionType.Extension;
-
-        public override Type Type => Operand.Type;
-
-        public override bool CanReduce => true;
-
-        public override Expression Reduce()
-            => Operand;
-
-        public void Print([NotNull] ExpressionPrinter expressionPrinter)
+        private class NavigationPropertyBindingExpressionVisitor : ExpressionVisitor
         {
-            expressionPrinter.StringBuilder.Append("NavEx([");
-            expressionPrinter.Visit(Root);
-            expressionPrinter.StringBuilder.Append("] ");
-            expressionPrinter.Visit(Operand);
-            expressionPrinter.StringBuilder.Append(")");
-        }
+            private IModel _model;
 
-        public override string ToString()
-            => "NavEx([" + Root + "] "  + Operand.ToString() + ")";
-    }
-
-    public class PropertyBindingCreatingExpressionVisitor : ExpressionVisitor
-    {
-        private IModel _model;
-
-        public PropertyBindingCreatingExpressionVisitor(IModel model)
-        {
-            _model = model;
-        }
-
-        protected override Expression VisitMember(MemberExpression memberExpression)
-        {
-            var newExpression = Visit(memberExpression.Expression);
-
-            var rootExpression = newExpression;
-            var entityType = _model.FindEntityType(newExpression.Type);
-            var navigations = new List<INavigation>();
-
-            if (newExpression is NavigationBindingExpression navigationBindingExpression)
+            public NavigationPropertyBindingExpressionVisitor(IModel model)
             {
-                rootExpression = navigationBindingExpression.Root;
-                entityType = navigationBindingExpression.Navigations.Last().GetTargetType();
-                navigations.AddRange(navigationBindingExpression.Navigations);
+                _model = model;
             }
 
-            if (entityType != null)
+            public (Expression root, IReadOnlyList<INavigation> navigations) BindNavigationProperties(Expression expression)
             {
-                var navigation = entityType.FindNavigation(memberExpression.Member.Name);
-                if (navigation != null)
+                var result = Visit(expression);
+
+                return result is NavigationBindingExpression navigationBindingExpression
+                    ? (source: navigationBindingExpression.Root, navigations: navigationBindingExpression.Navigations)
+                    : (source: expression, navigations: new List<INavigation>().AsReadOnly());
+            }
+
+            protected override Expression VisitMember(MemberExpression memberExpression)
+            {
+                var newExpression = Visit(memberExpression.Expression);
+
+                var rootExpression = newExpression;
+
+                // TODO: decorate lambda with model information and extract it from there
+                var entityType = _model.FindEntityType(newExpression.Type);
+                var navigations = new List<INavigation>();
+
+                if (newExpression is NavigationBindingExpression navigationBindingExpression)
                 {
-                    navigations.Add(navigation);
-                    newExpression = (newExpression as NavigationBindingExpression)?.Operand ?? newExpression;
-
-                    var newOperandLambda = (newExpression as NavigationBindingExpression)?.OperandLambda;
-
-                    return new NavigationBindingExpression(memberExpression.Update(newExpression), newOperandLambda, rootExpression, navigations);
+                    rootExpression = navigationBindingExpression.Root;
+                    entityType = navigationBindingExpression.Navigations.Last().GetTargetType();
+                    navigations.AddRange(navigationBindingExpression.Navigations);
                 }
-            }
 
-            return newExpression != memberExpression.Expression
-                ? memberExpression.Update(newExpression)
-                : memberExpression;
+                if (entityType != null)
+                {
+                    var navigation = entityType.FindNavigation(memberExpression.Member.Name);
+                    if (navigation != null)
+                    {
+                        navigations.Add(navigation);
+
+                        return new NavigationBindingExpression(rootExpression, navigations, memberExpression.Type);
+                    }
+                }
+
+                return newExpression != memberExpression.Expression
+                    ? memberExpression.Update(newExpression)
+                    : memberExpression;
+            }
+        }
+
+        private class NavigationBindingExpression : Expression
+        {
+            private Type _type;
+
+            public Expression Root { get; }
+            public IReadOnlyList<INavigation> Navigations { get; }
+
+            public override ExpressionType NodeType => ExpressionType.Extension;
+            public override Type Type => _type;
+
+            public NavigationBindingExpression(Expression root, List<INavigation> navigations, Type type)
+            {
+                Root = root;
+                Navigations = navigations.AsReadOnly();
+                _type = type;
+            }
         }
     }
+
+    //public class PropertyBindingCreatingExpressionVisitor : ExpressionVisitor
+    //{
+    //    private IModel _model;
+
+    //    public PropertyBindingCreatingExpressionVisitor(IModel model)
+    //    {
+    //        _model = model;
+    //    }
+
+    //    protected override Expression VisitMember(MemberExpression memberExpression)
+    //    {
+    //        var newExpression = Visit(memberExpression.Expression);
+
+    //        var rootExpression = newExpression;
+    //        var entityType = _model.FindEntityType(newExpression.Type);
+    //        var navigations = new List<INavigation>();
+
+    //        if (newExpression is NavigationBindingExpression navigationBindingExpression)
+    //        {
+    //            rootExpression = navigationBindingExpression.Root;
+    //            entityType = navigationBindingExpression.Navigations.Last().GetTargetType();
+    //            navigations.AddRange(navigationBindingExpression.Navigations);
+    //        }
+
+    //        if (entityType != null)
+    //        {
+    //            var navigation = entityType.FindNavigation(memberExpression.Member.Name);
+    //            if (navigation != null)
+    //            {
+    //                navigations.Add(navigation);
+    //                newExpression = (newExpression as NavigationBindingExpression)?.Operand ?? newExpression;
+
+    //                return new NavigationBindingExpression(memberExpression.Update(newExpression), rootExpression, navigations);
+    //            }
+    //        }
+
+    //        return newExpression != memberExpression.Expression
+    //            ? memberExpression.Update(newExpression)
+    //            : memberExpression;
+    //    }
+    //}
 
     public class NavigationExpandingExpressionVisitor : LinqQueryExpressionVisitorBase
     {
@@ -147,11 +182,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         public virtual Expression ExpandNavigations(Expression expression)
         {
-            var propertyBindingCreatingExpressionVisitor = new PropertyBindingCreatingExpressionVisitor(_model);
-            var newExpression = propertyBindingCreatingExpressionVisitor.Visit(expression);
+            //var propertyBindingCreatingExpressionVisitor = new PropertyBindingCreatingExpressionVisitor(_model);
+            //var newExpression = propertyBindingCreatingExpressionVisitor.Visit(expression);
 
             var collectionNaviagtionRewritingExpressionVisitor = new CollectionNavigationRewritingExpressionVisitor(_model);
-            newExpression = collectionNaviagtionRewritingExpressionVisitor.Visit(newExpression);
+            var newExpression = collectionNaviagtionRewritingExpressionVisitor.Visit(expression);
 
             newExpression = Visit(newExpression);
 
@@ -164,8 +199,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var selector = Visit(methodCallExpression.Arguments[1]);
             var parameter = (selector.UnwrapQuote() as LambdaExpression).Parameters[0];
             var transparentIdentifierAccessorMapping = new List<(List<string> from, List<string> to)>();
-            var selectorMapping = new List<(List<string> from, List<INavigation> to)>();
-            var previousSelectors = new List<Expression>();
+            //var selectorMapping = new List<(List<string> from, List<INavigation> to)>();
+            //var previousSelectors = new List<(Expression body, ParameterExpression parameter)>();
+            var previousSelector = default(LambdaExpression);
             var foundNavigations = new List<NavigationPathNode>();
             var finalProjectionPath = new List<string>();
             var newParameter = parameter;
@@ -175,13 +211,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 source = navigationExpansionExpression.Operand;
                 newParameter = navigationExpansionExpression.ParameterExpression;
                 transparentIdentifierAccessorMapping = navigationExpansionExpression.TransparentIdentifierAccessorMapping;
-                selectorMapping = navigationExpansionExpression.SelectorMapping;
-                previousSelectors = navigationExpansionExpression.PreviousSelectors;
+                //selectorMapping = navigationExpansionExpression.SelectorMapping;
+                //previousSelectors = navigationExpansionExpression.PreviousSelectors;
+                previousSelector = navigationExpansionExpression.PreviousSelector;
                 foundNavigations = navigationExpansionExpression.FoundNavigations;
                 finalProjectionPath = navigationExpansionExpression.FinalProjectionPath;
             }
 
-            var nfev = new NavigationFindingExpressionVisitor(_model, parameter, selectorMapping, previousSelectors, foundNavigations);
+            var pscev = new PreviousSelectorCompensatingExpressionVisitor(previousSelector, parameter);
+            selector = pscev.Visit(selector);
+
+            var nfev = new NavigationFindingExpressionVisitor(_model, previousSelector?.Parameters[0] ?? parameter, foundNavigations);
             nfev.Visit(selector);
 
             var result = (source, parameter: newParameter);
@@ -209,9 +249,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var nrev = new NavigationReplacingExpressionVisitor(
                 _model,
                 parameter,
+                previousSelector?.Parameters[0],
                 result.parameter,
-                transparentIdentifierAccessorMapping,
-                selectorMapping);
+                transparentIdentifierAccessorMapping);
 
             var newSelector = nrev.Visit(selector);
 
@@ -221,16 +261,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             var rewritten = Expression.Call(newMethodInfo, newSource, newSelector);
             finalProjectionPath.Clear();
-            transparentIdentifierAccessorMapping.Clear(); // is this correct?
+            //transparentIdentifierAccessorMapping.Clear(); // is this correct?
 
-            previousSelectors.Add(((LambdaExpression)selector.UnwrapQuote()).Body);
+            previousSelector = (LambdaExpression)selector.UnwrapQuote();
 
             return new NavigationExpansionExpression(
                 rewritten,
                 result.parameter,
                 transparentIdentifierAccessorMapping,
-                selectorMapping,
-                previousSelectors,
+                previousSelector,
+                //selectorMapping,
+                //previousSelectors,
                 foundNavigations,
                 finalProjectionPath,
                 methodCallExpression.Type);
@@ -286,12 +327,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private class PreviousSelectorCompensatingExpressionVisitor : ExpressionVisitor
         {
-            private List<Expression> _previousSelectors;
+            //private List<(Expression body, ParameterExpression parameter)> _previousSelectors;
+            private LambdaExpression _previousSelector;
             private ParameterExpression _parameterExpression;
 
-            public PreviousSelectorCompensatingExpressionVisitor(IEnumerable<Expression> previousSelectors, ParameterExpression parameterExpression)
+            //public PreviousSelectorCompensatingExpressionVisitor(IEnumerable<(Expression body, ParameterExpression parameter)> previousSelectors, ParameterExpression parameterExpression)
+            public PreviousSelectorCompensatingExpressionVisitor(LambdaExpression previousSelector, ParameterExpression parameterExpression)
             {
-                _previousSelectors = previousSelectors.ToList();
+                _previousSelector = previousSelector;
+                //_previousSelectors = previousSelectors.ToList();
                 _parameterExpression = parameterExpression;
             }
 
@@ -305,19 +349,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             }
 
             protected override Expression VisitParameter(ParameterExpression parameterExpression)
-            {
-                if (parameterExpression == _parameterExpression
-                    && _previousSelectors.Any())
-                {
-                    var count = _previousSelectors.Count;
-                    var lastSelector = _previousSelectors[count - 1];
-                    //_previousSelectors.RemoveAt(count - 1);
-
-                    return lastSelector;
-                }
-
-                return base.VisitParameter(parameterExpression);
-            }
+                => parameterExpression == _parameterExpression && _previousSelector != null
+                ? _previousSelector.Body
+                : base.VisitParameter(parameterExpression);
 
             protected override Expression VisitMember(MemberExpression memberExpression)
             {
@@ -341,30 +375,34 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 return base.VisitMethodCall(methodCallExpression);
             }
 
-            protected override Expression VisitExtension(Expression extensionExpression)
-            {
-                if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
-                {
-                    var newRoot = Visit(navigationBindingExpression.Root);
+            //protected override Expression VisitExtension(Expression extensionExpression)
+            //{
+            //    if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
+            //    {
+            //        var newRoot = Visit(navigationBindingExpression.Root);
 
-                    if (newRoot != navigationBindingExpression.Root)
-                    {
-                        if (newRoot is NavigationBindingExpression navigationBindingExpressionRoot)
-                        {
-                            var navigations = navigationBindingExpressionRoot.Navigations.Union(navigationBindingExpression.Navigations);
-
-                            // combine
-                        }
-                    }
+            //        if (newRoot != navigationBindingExpression.Root)
+            //        {
+            //            var fubar = new NavigationBindingExpression()
 
 
 
-                    var newOperand = Visit(navigationBindingExpression.Operand);
+            //            if (newRoot is NavigationBindingExpression navigationBindingExpressionRoot)
+            //            {
+            //                var navigations = navigationBindingExpressionRoot.Navigations.Union(navigationBindingExpression.Navigations);
 
-                }
+            //                // combine
+            //            }
+            //        }
 
-                return base.VisitExtension(extensionExpression);
-            }
+
+
+            //        var newOperand = Visit(navigationBindingExpression.Operand);
+
+            //    }
+
+            //    return base.VisitExtension(extensionExpression);
+            //}
         }
 
         protected override Expression VisitExtension(Expression extensionExpression)
@@ -379,22 +417,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 return result;
             }
 
-
-
-
-
-
-
-
-
             if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableWhereMethodInfo))
             {
                 var source = Visit(methodCallExpression.Arguments[0]);
                 var predicate = Visit(methodCallExpression.Arguments[1]);
                 var parameter = (predicate.UnwrapQuote() as LambdaExpression).Parameters[0];
                 var transparentIdentifierAccessorMapping = new List<(List<string> from, List<string> to)>();
-                var selectorMapping = new List<(List<string> from, List<INavigation> to)>();
-                var previousSelectors = new List<Expression>();
+                //var selectorMapping = new List<(List<string> from, List<INavigation> to)>();
+                //var previousSelectors = new List<(Expression body, ParameterExpression parameter)>();
+                var previousSelector = default(LambdaExpression);
                 var foundNavigations = new List<NavigationPathNode>();
                 var finalProjectionPath = new List<string>();
                 var newParameter = parameter;
@@ -404,17 +435,18 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     source = navigationExpansionExpression.Operand;
                     newParameter = navigationExpansionExpression.ParameterExpression;
                     transparentIdentifierAccessorMapping = navigationExpansionExpression.TransparentIdentifierAccessorMapping;
-                    selectorMapping = navigationExpansionExpression.SelectorMapping;
-                    previousSelectors = navigationExpansionExpression.PreviousSelectors;
+                    //selectorMapping = navigationExpansionExpression.SelectorMapping;
+                    //previousSelectors = navigationExpansionExpression.PreviousSelectors;
+                    previousSelector = navigationExpansionExpression.PreviousSelector;
                     foundNavigations = navigationExpansionExpression.FoundNavigations;
                     finalProjectionPath = navigationExpansionExpression.FinalProjectionPath;
                 }
 
-                var pscev = new PreviousSelectorCompensatingExpressionVisitor(previousSelectors, parameter);
+                var pscev = new PreviousSelectorCompensatingExpressionVisitor(previousSelector, parameter);
                 predicate = pscev.Visit(predicate);
 
-
-                var nfev = new NavigationFindingExpressionVisitor(_model, parameter, selectorMapping, previousSelectors, foundNavigations);
+                var nfev = new NavigationFindingExpressionVisitor(_model, previousSelector?.Parameters[0] ?? parameter, foundNavigations);
+                //var nfev = new NavigationFindingExpressionVisitor(_model, parameter, selectorMapping, previousSelectors, foundNavigations);
                 nfev.Visit(predicate);
 
                 var result = (source, parameter: newParameter);
@@ -437,9 +469,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 var nrev = new NavigationReplacingExpressionVisitor(
                     _model,
                     parameter,
+                    previousSelector?.Parameters[0],
+                    //previousSelectors.LastOrDefault().parameter ?? parameter,
                     result.parameter,
-                    transparentIdentifierAccessorMapping,
-                    selectorMapping);
+                    transparentIdentifierAccessorMapping/*,
+                    selectorMapping*/);
 
                 var newPredicate = nrev.Visit(predicate);
 
@@ -451,8 +485,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     rewritten,
                     result.parameter,
                     transparentIdentifierAccessorMapping,
-                    selectorMapping,
-                    previousSelectors,
+                    previousSelector,
+                    //selectorMapping,
+                    //previousSelectors,
                     foundNavigations,
                     finalProjectionPath,
                     methodCallExpression.Type);
@@ -831,35 +866,30 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     {
         private IModel _model;
         private ParameterExpression _sourceParameter;
-        private List<(List<string> from, List<INavigation> to)> _selectorMapping;
-        private List<Expression> _previousSelectors;
 
         public List<NavigationPathNode> FoundNavigationPaths { get; }
 
         public NavigationFindingExpressionVisitor(
             IModel model,
             ParameterExpression sourceParameter,
-            List<(List<string> from, List<INavigation> to)> selectorMapping,
-            List<Expression> previousSelectors,
             List<NavigationPathNode> foundNavigationPaths)
         {
             _model = model;
             _sourceParameter = sourceParameter;
-            _selectorMapping = selectorMapping;
-            _previousSelectors = previousSelectors;
             FoundNavigationPaths = foundNavigationPaths;
         }
 
-        protected override Expression VisitExtension(Expression extensionExpression)
+        protected override Expression VisitMember(MemberExpression memberExpression)
         {
-            if (extensionExpression is NavigationBindingExpression navigationBindingExpression
-                && navigationBindingExpression.Root == _sourceParameter)
+            var binding = NavigationPropertyBinder.BindNavigationProperties(memberExpression, _model);
+            if (binding.root == _sourceParameter
+                && binding.navigations.Any())
             {
                 // TODO: inheritance?!
-                var inheritanceRoot = navigationBindingExpression.Navigations[0].ClrType != navigationBindingExpression.Root.Type
-                    && navigationBindingExpression.Navigations[0].DeclaringEntityType.GetAllBaseTypes().Any(t => t.ClrType == navigationBindingExpression.Root.Type);
+                var inheritanceRoot = binding.navigations[0].ClrType != binding.root.Type
+                    && binding.navigations[0].DeclaringEntityType.GetAllBaseTypes().Any(t => t.ClrType == binding.root.Type);
 
-                var navigationPath = NavigationPathNode.Create(navigationBindingExpression.Navigations, inheritanceRoot);
+                var navigationPath = NavigationPathNode.Create(binding.navigations, inheritanceRoot);
                 if (!FoundNavigationPaths.Any(p => p.Contains(navigationPath)))
                 {
                     var success = false;
@@ -876,10 +906,43 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         FoundNavigationPaths.Add(navigationPath);
                     }
                 }
+
+                return memberExpression;
             }
 
-            return extensionExpression;
+            return base.VisitMember(memberExpression);
         }
+
+        //protected override Expression VisitExtension(Expression extensionExpression)
+        //{
+        //    if (extensionExpression is NavigationBindingExpression navigationBindingExpression
+        //        && navigationBindingExpression.Root == _sourceParameter)
+        //    {
+        //        // TODO: inheritance?!
+        //        var inheritanceRoot = navigationBindingExpression.Navigations[0].ClrType != navigationBindingExpression.Root.Type
+        //            && navigationBindingExpression.Navigations[0].DeclaringEntityType.GetAllBaseTypes().Any(t => t.ClrType == navigationBindingExpression.Root.Type);
+
+        //        var navigationPath = NavigationPathNode.Create(navigationBindingExpression.Navigations, inheritanceRoot);
+        //        if (!FoundNavigationPaths.Any(p => p.Contains(navigationPath)))
+        //        {
+        //            var success = false;
+        //            foreach (var foundNavigationPath in FoundNavigationPaths)
+        //            {
+        //                if (!success)
+        //                {
+        //                    success = foundNavigationPath.TryCombine(navigationPath);
+        //                }
+        //            }
+
+        //            if (!success)
+        //            {
+        //                FoundNavigationPaths.Add(navigationPath);
+        //            }
+        //        }
+        //    }
+
+        //    return extensionExpression;
+        //}
 
         //protected override Expression VisitMember(MemberExpression memberExpression)
         //{
@@ -925,32 +988,36 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     {
         private IModel _model;
         private ParameterExpression _sourceParameter;
+        private ParameterExpression _previousSelectorParameter;
         private ParameterExpression _transparentIdentifierParameter;
         private List<(List<string> from, List<string> to)> _transparentIdentifierAccessorMapping;
-        private List<(List<string> from, List<INavigation> to)> _selectorMapping;
+        //private List<(List<string> from, List<INavigation> to)> _selectorMapping;
 
         public NavigationReplacingExpressionVisitor(
             IModel model,
             ParameterExpression sourceParameter,
+            ParameterExpression previousSelectorParameter,
             ParameterExpression transparentIdentifierParameter,
-            List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping,
-            List<(List<string> from, List<INavigation> to)> selectorMapping)
+            List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping/*,
+            List<(List<string> from, List<INavigation> to)> selectorMapping*/)
         {
             _model = model;
             _sourceParameter = sourceParameter;
+            _previousSelectorParameter = previousSelectorParameter;
             _transparentIdentifierParameter = transparentIdentifierParameter;
             _transparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
-            _selectorMapping = selectorMapping;
+            //_selectorMapping = selectorMapping;
         }
 
-        protected override Expression VisitExtension(Expression extensionExpression)
+        protected override Expression VisitMember(MemberExpression memberExpression)
         {
-            if (extensionExpression is NavigationBindingExpression navigationBindingExpression
-                && navigationBindingExpression.Root == _sourceParameter)
+            var binding = NavigationPropertyBinder.BindNavigationProperties(memberExpression, _model);
+            if ((binding.root == _sourceParameter || binding.root == _previousSelectorParameter)
+                && binding.navigations.Any())
             {
                 var transparentIdentifierAccessorPath = _transparentIdentifierAccessorMapping.Where(
-                    m => m.from.Count == navigationBindingExpression.Navigations.Count
-                    && m.from.Zip(navigationBindingExpression.Navigations.Select(p => p.Name), (o, i) => o == i).All(e => e)).SingleOrDefault().to;
+                    m => m.from.Count == binding.navigations.Count
+                    && m.from.Zip(binding.navigations.Select(p => p.Name), (o, i) => o == i).All(e => e)).SingleOrDefault().to;
 
                 if (transparentIdentifierAccessorPath != null)
                 {
@@ -959,9 +1026,40 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     return result;
                 }
             }
+            //if (parameterExpression == _sourceParameter
+            //    && properties.Any())
+            //{
+            //    var transparentIdentifierAccessorPath = _transparentIdentifierAccessorMapping.Where(m => m.from.Count == properties.Count && m.from.Zip(properties.Select(p => p.Name), (o, i) => o == i).All(e => e)).SingleOrDefault().to;
+            //    if (transparentIdentifierAccessorPath != null)
+            //    {
+            //        var result = BuildTransparentIdentifierAccessorExpression(_transparentIdentifierParameter, transparentIdentifierAccessorPath);
 
-            return base.VisitExtension(extensionExpression);
+            //        return result;
+            //    }
+            //}
+
+            return base.VisitMember(memberExpression);
         }
+
+        //protected override Expression VisitExtension(Expression extensionExpression)
+        //{
+        //    if (extensionExpression is NavigationBindingExpression navigationBindingExpression
+        //        && navigationBindingExpression.Root == _sourceParameter)
+        //    {
+        //        var transparentIdentifierAccessorPath = _transparentIdentifierAccessorMapping.Where(
+        //            m => m.from.Count == navigationBindingExpression.Navigations.Count
+        //            && m.from.Zip(navigationBindingExpression.Navigations.Select(p => p.Name), (o, i) => o == i).All(e => e)).SingleOrDefault().to;
+
+        //        if (transparentIdentifierAccessorPath != null)
+        //        {
+        //            var result = BuildTransparentIdentifierAccessorExpression(_transparentIdentifierParameter, transparentIdentifierAccessorPath);
+
+        //            return result;
+        //        }
+        //    }
+
+        //    return base.VisitExtension(extensionExpression);
+        //}
 
         //protected override Expression VisitMember(MemberExpression memberExpression)
         //{
@@ -1008,7 +1106,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitParameter(ParameterExpression parameterExpression)
         {
-            if (parameterExpression == _sourceParameter)
+            if (parameterExpression == _sourceParameter
+                || parameterExpression == _previousSelectorParameter)
             {
                 var transparentIdentifierRootPath = _transparentIdentifierAccessorMapping.Where(m => m.from.Count == 0).SingleOrDefault().to;
 

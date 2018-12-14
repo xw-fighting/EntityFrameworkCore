@@ -5463,10 +5463,27 @@ namespace Microsoft.EntityFrameworkCore.Query
                 //            select l1.Id;
 
 
-                var query = ctx.LevelOne.Select(c => c.OneToOne_Optional_PK1.OneToOne_Required_FK2.OneToMany_Optional3.Where(e => e.Id > 0)).ToList();
+                //var query = ctx.LevelOne.Select(c => c.OneToOne_Optional_PK1.OneToOne_Required_FK2.OneToMany_Optional3.Where(e => e.Id > 0)).ToList();
 
-
-                //var query = ctx.LevelOne.Select(c => new { Foo = new { Bar = c.OneToOne_Optional_PK1 } }).Where(r => r.Foo.Bar.OneToOne_Required_FK2.Name == "Foo");
+                var query = ctx.LevelOne.Select(c => new
+                {
+                    c = c,
+                    Foo = new
+                    {
+                        Bar = c.OneToOne_Optional_PK1,
+                        Baz = c.OneToOne_Optional_PK1.OneToOne_Required_FK2,
+                    }
+                })
+                .Select(c2 => new
+                {
+                    c2 = c2.c,
+                    Foo2 = new
+                    {
+                        Bar2 = c2.Foo.Bar.OneToOne_Required_FK2,
+                        Baz2 = c2.Foo.Baz
+                    }
+                })
+                .Where(r => r.Foo2.Bar2.OneToOne_Required_FK3.Name == r.Foo2.Baz2.OneToOne_Optional_FK_Inverse3.Name && r.c2.Name != "Foo");
 
 
                 //var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_PK2.Name != "Foo").Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2.OneToOne_Optional_PK3.Id > 0 );
