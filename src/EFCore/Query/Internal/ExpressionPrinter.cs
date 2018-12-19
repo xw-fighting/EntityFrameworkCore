@@ -798,7 +798,14 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
         {
             if (_parametersInScope.ContainsKey(parameterExpression))
             {
-                _stringBuilder.Append(_parametersInScope[parameterExpression]);
+                if (_parametersInScope[parameterExpression].Contains("."))
+                {
+                    _stringBuilder.Append("[" + _parametersInScope[parameterExpression] + "]");
+                }
+                else
+                {
+                    _stringBuilder.Append(_parametersInScope[parameterExpression]);
+                }
             }
             else
             {

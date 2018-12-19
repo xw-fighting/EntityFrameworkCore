@@ -5465,14 +5465,20 @@ namespace Microsoft.EntityFrameworkCore.Query
 
                 //var query = ctx.LevelOne.Select(c => c.OneToOne_Optional_PK1.OneToOne_Required_FK2.OneToMany_Optional3.Where(e => e.Id > 0)).ToList();
 
-
-
-
                 var query = ctx.LevelOne
-                    .Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")    // l1 - Outer | l1.OneToOne_Optional_FK1 - Inner
-                    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Bar")    // l1 - Outer.Outer | l1.OneToOne_Optional_FK1 - Outer.Inner | l1.OneToOne_Optional_PK1 - Inner
-                    .Select(l1 => new { foo = l1.OneToOne_Optional_PK1 })   // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo
-                    .Where(l2 => l2.foo.OneToOne_Optional_FK2.Name != "Baz"); // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo.Outer | l1.OneToOne_Optional_PK1.OneToOne_Optional_FK2 - foo.Inner
+                    .Where(l1 => l1.OneToOne_Optional_FK1.OneToOne_Required_FK2.Name != "Foo" && l1.OneToOne_Required_FK1.Name != "Foo")
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    .Select(x => new { bar = x.foo })
+                    .Where(xx => xx.bar.OneToOne_Required_FK2.Id > 0)
+                    //.Distinct()
+                    .Select(xxx => new { baz = xxx.bar.OneToOne_Required_FK2 })
+                    .Where(xxxx => xxxx.baz.OneToOne_Required_FK3.Name != "Bar"); // need to remap again
+
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")    // l1 - Outer | l1.OneToOne_Optional_FK1 - Inner
+                //    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Bar")    // l1 - Outer.Outer | l1.OneToOne_Optional_FK1 - Outer.Inner | l1.OneToOne_Optional_PK1 - Inner
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_PK1 })   // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo
+                //    .Where(l2 => l2.foo.OneToOne_Optional_FK2.Name != "Baz"); // l1 - N/A | l1.OneToOne_Optional_FK1 - N/A | l1.OneToOne_Optional_PK1 - foo.Outer | l1.OneToOne_Optional_PK1.OneToOne_Optional_FK2 - foo.Inner
 
 
 

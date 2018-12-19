@@ -7,7 +7,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 
@@ -40,11 +39,11 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             
         public Expression Operand { get; }
 
-        public ParameterExpression ParameterExpression { get; }
+        public ParameterExpression CurrentParameter { get; }
 
         public List<(List<string> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
-        //public List<(List<string> from, List<INavigation> to)> SelectorMapping { get; }
-        public LambdaExpression PreviousSelector { get; }
+
+        public List<LambdaExpression> PendingSelectors { get; }
 
         public List<NavigationPathNode> FoundNavigations { get; }
 
@@ -52,21 +51,17 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public NavigationExpansionExpression(
             Expression operand,
-            ParameterExpression parameterExpression,
+            ParameterExpression currentExpression,
             List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping,
-            //List<(List<string> from, List<INavigation> to)> selectorMapping,
-            //List<(Expression body, ParameterExpression parameter)> previousSelectors,
-            LambdaExpression previousSelector,
+            List<LambdaExpression> pendingSelectors,
             List<NavigationPathNode> foundNavigations,
             List<string> finalProjectionPath,
             Type returnType)
         {
             Operand = operand;
-            ParameterExpression = parameterExpression;
+            CurrentParameter = currentExpression;
             TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
-            //SelectorMapping = selectorMapping;
-            //PreviousSelectors = previousSelectors;
-            PreviousSelector = previousSelector;
+            PendingSelectors = pendingSelectors;
             FoundNavigations = foundNavigations;
             FinalProjectionPath = finalProjectionPath;
             _returnType = returnType;
