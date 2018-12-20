@@ -43,6 +43,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public List<(List<string> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
 
+        public List<LambdaExpression> AppliedSelectors { get; }
         public List<LambdaExpression> PendingSelectors { get; }
 
         public List<NavigationPathNode> FoundNavigations { get; }
@@ -53,6 +54,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             Expression operand,
             ParameterExpression currentExpression,
             List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping,
+            List<LambdaExpression> appliedSelectors,
             List<LambdaExpression> pendingSelectors,
             List<NavigationPathNode> foundNavigations,
             List<string> finalProjectionPath,
@@ -61,6 +63,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             Operand = operand;
             CurrentParameter = currentExpression;
             TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
+            AppliedSelectors = appliedSelectors;
             PendingSelectors = pendingSelectors;
             FoundNavigations = foundNavigations;
             FinalProjectionPath = finalProjectionPath;

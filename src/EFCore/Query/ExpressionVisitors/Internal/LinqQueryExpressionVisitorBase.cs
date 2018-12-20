@@ -20,20 +20,22 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         protected MethodInfo QueryableSelectManyMethodInfo { get; set; }
         protected MethodInfo QueryableSelectManyWithResultOperatorMethodInfo { get; set; }
 
-        protected MethodInfo QueryableFirstPredicate { get; set; }
-        protected MethodInfo QueryableFirstOrDefaultPredicate { get; set; }
-        protected MethodInfo QueryableSinglePredicate { get; set; }
-        protected MethodInfo QueryableSingleOrDefaultPredicate { get; set; }
+        protected MethodInfo QueryableFirstPredicateMethodInfo { get; set; }
+        protected MethodInfo QueryableFirstOrDefaultPredicateMethodInfo { get; set; }
+        protected MethodInfo QueryableSinglePredicateMethodInfo { get; set; }
+        protected MethodInfo QueryableSingleOrDefaultPredicateMethodInfo { get; set; }
 
-        protected MethodInfo QueryableCount { get; set; }
-        protected MethodInfo QueryableCountPredicate { get; set; }
+        protected MethodInfo QueryableCountMethodInfo { get; set; }
+        protected MethodInfo QueryableCountPredicateMethodInfo { get; set; }
+        protected MethodInfo QueryableDistinctMethodInfo { get; set; }
 
-        protected MethodInfo EnumerableFirstPredicate { get; set; }
-        protected MethodInfo EnumerableFirstOrDefaultPredicate { get; set; }
-        protected MethodInfo EnumerableSinglePredicate { get; set; }
-        protected MethodInfo EnumerableSingleOrDefaultPredicate { get; set; }
 
-        protected MethodInfo EnumerableDefaultIfEmpty { get; set; }
+        protected MethodInfo EnumerableFirstPredicateMethodInfo { get; set; }
+        protected MethodInfo EnumerableFirstOrDefaultPredicateMethodInfo { get; set; }
+        protected MethodInfo EnumerableSinglePredicateMethodInfo { get; set; }
+        protected MethodInfo EnumerableSingleOrDefaultPredicateMethodInfo { get; set; }
+
+        protected MethodInfo EnumerableDefaultIfEmptyMethodInfo { get; set; }
 
         protected LinqQueryExpressionVisitorBase()
         {
@@ -51,22 +53,24 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             QueryableSelectManyMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.SelectMany) && m.GetParameters().Count() == 2 && m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Count() == 2).Single();
             QueryableSelectManyWithResultOperatorMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.SelectMany) && m.GetParameters().Count() == 3 && m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Count() == 2).Single();
 
-            QueryableFirstPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.First) && m.GetParameters().Count() == 2).Single();
-            QueryableFirstOrDefaultPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.FirstOrDefault) && m.GetParameters().Count() == 2).Single();
-            QueryableSinglePredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.Single) && m.GetParameters().Count() == 2).Single();
-            QueryableSingleOrDefaultPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.SingleOrDefault) && m.GetParameters().Count() == 2).Single();
+            QueryableFirstPredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.First) && m.GetParameters().Count() == 2).Single();
+            QueryableFirstOrDefaultPredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.FirstOrDefault) && m.GetParameters().Count() == 2).Single();
+            QueryableSinglePredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Single) && m.GetParameters().Count() == 2).Single();
+            QueryableSingleOrDefaultPredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.SingleOrDefault) && m.GetParameters().Count() == 2).Single();
 
-            QueryableCount = queryableMethods.Where(m => m.Name == nameof(Queryable.Count) && m.GetParameters().Count() == 1).Single();
-            QueryableCountPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.Count) && m.GetParameters().Count() == 2).Single();
+            QueryableCountMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Count) && m.GetParameters().Count() == 1).Single();
+            QueryableCountPredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Count) && m.GetParameters().Count() == 2).Single();
+
+            QueryableDistinctMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Distinct) && m.GetParameters().Count() == 1).Single();
 
             var enumerableMethods = typeof(Enumerable).GetMethods().ToList();
 
-            EnumerableFirstPredicate = enumerableMethods.Where(m => m.Name == nameof(Enumerable.First) && m.GetParameters().Count() == 2).Single();
-            EnumerableFirstOrDefaultPredicate = enumerableMethods.Where(m => m.Name == nameof(Enumerable.FirstOrDefault) && m.GetParameters().Count() == 2).Single();
-            EnumerableSinglePredicate = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Single) && m.GetParameters().Count() == 2).Single();
-            EnumerableSingleOrDefaultPredicate = enumerableMethods.Where(m => m.Name == nameof(Enumerable.SingleOrDefault) && m.GetParameters().Count() == 2).Single();
+            EnumerableFirstPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.First) && m.GetParameters().Count() == 2).Single();
+            EnumerableFirstOrDefaultPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.FirstOrDefault) && m.GetParameters().Count() == 2).Single();
+            EnumerableSinglePredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Single) && m.GetParameters().Count() == 2).Single();
+            EnumerableSingleOrDefaultPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.SingleOrDefault) && m.GetParameters().Count() == 2).Single();
 
-            EnumerableDefaultIfEmpty = enumerableMethods.Where(m => m.Name == nameof(Enumerable.DefaultIfEmpty) && m.GetParameters().Count() == 1).Single();
+            EnumerableDefaultIfEmptyMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.DefaultIfEmpty) && m.GetParameters().Count() == 1).Single();
         }
     }
 }

@@ -103,8 +103,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             var navigationExpander = new NavigationExpander(_model);
             var newQuery = navigationExpander.ExpandNavigations(query);
-            //var navigationExpandingExpressionVisitor = new NavigationExpandingExpressionVisitor(_model);
-            //var newQuery = navigationExpandingExpressionVisitor.ExpandNavigations(query);
 
             var compiledQuery
                 = _compiledQueryCache
@@ -252,8 +250,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             query = ExtractParameters(query, queryContext, _logger);
 
-            var navigationExpandingExpressionVisitor = new NavigationExpandingExpressionVisitor(_model);
-            var newQuery = navigationExpandingExpressionVisitor.ExpandNavigations(query);
+            var navigationExpander = new NavigationExpander(_model);
+            var newQuery = navigationExpander.ExpandNavigations(query);
 
             var compiledQuery
                 = _compiledQueryCache
