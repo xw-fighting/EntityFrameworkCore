@@ -21,6 +21,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     public class CollectionNavigationRewritingExpressionVisitor : LinqQueryExpressionVisitorBase
     {
         private ParameterExpression _sourceParameter;
+        private List<(List<INavigation> from, List<string> to)> _transparentIdentifierAccessorMapping;
         private List<(List<string> path, IEntityType entityType)> _entityTypeAccessorMapping;
         private List<NavigationPathNode> _foundNavigationPaths;
 
@@ -28,10 +29,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         public CollectionNavigationRewritingExpressionVisitor(
             ParameterExpression sourceParameter,
+            List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
             List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
             List<NavigationPathNode> foundNavigationPaths)
         {
             _sourceParameter = sourceParameter;
+            _transparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
             _entityTypeAccessorMapping = entityTypeAccessorMapping;
             _foundNavigationPaths = foundNavigationPaths;
         }
@@ -85,7 +88,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitMember(MemberExpression memberExpression)
         {
-            var binding = NavigationPropertyBinder.BindNavigationProperties(memberExpression, _sourceParameter, _entityTypeAccessorMapping);
+            var binding = NavigationPropertyBinder.BindNavigationProperties(memberExpression, _sourceParameter, _transparentIdentifierAccessorMapping, _entityTypeAccessorMapping);
             if (binding.navigations.Any()
                 && binding.navigations.Last() is INavigation navigation
                 && navigation.IsCollection())
