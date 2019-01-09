@@ -5473,9 +5473,26 @@ namespace Microsoft.EntityFrameworkCore.Query
                 //    .Select(xx => new { bar = xx.foo.OneToOne_Optional_PK2 })
                 //    .Where(xxx => xxx.bar.OneToMany_Optional3.Count() > 0);
 
+
+
                 var query = ctx.LevelOne
                     .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
-                    .Where(x => x.foo.OneToOne_Required_FK2.OneToMany_Optional3.Count() > 0);
+                    .Where(x => x.foo.OneToOne_Optional_FK2.Name != "foo")
+                    .Where(x => x.foo.OneToOne_Required_FK2.Name != "bar")
+                    .OrderBy(x => x.foo.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Id);
+
+
+
+                //var query = ctx.LevelOne
+                //    .Select(l1 => new { foo = l1 })
+                //    .Where(x => x.foo.OneToOne_Optional_FK1.Name != "foo")
+                //    .Where(x => x.foo.OneToOne_Required_FK1.Name != "bar")
+                //    .OrderBy(x => x.foo.OneToOne_Optional_FK1.OneToOne_Optional_FK2.Id);
+
+
+                //var query = ctx.LevelOne
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                //    .Where(x => x.foo.OneToOne_Required_FK2.OneToMany_Optional3.Count() > 0);
 
 
 

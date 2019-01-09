@@ -75,7 +75,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public ParameterExpression FirstSelectorParameter { get; } // parameter of first selector - this will be the root of all the navigations after selectors are applied to the current lambda
         public ParameterExpression CurrentParameter { get; } // parameter of the current lambda 
 
-        public List<(List<string> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
+        public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
         public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
 
         public LambdaExpression AppliedSelector { get; }
@@ -89,7 +89,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             Expression operand,
             ParameterExpression firstSelectorParameter,
             ParameterExpression currentParameter,
-            List<(List<string> from, List<string> to)> transparentIdentifierAccessorMapping,
+            List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
             List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
             LambdaExpression appliedSelector,
             LambdaExpression pendingSelector,
