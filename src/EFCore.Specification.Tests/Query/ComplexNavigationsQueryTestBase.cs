@@ -5480,6 +5480,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     .Where(x => x.foo.OneToOne_Optional_FK2.Name != "foo")
                     .Where(x => x.foo.OneToOne_Required_FK2.Name != "bar")
                     .OrderBy(x => x.foo.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Id);
+                    //.OrderBy(x => x.foo.OneToOne_Optional_FK2.Id);
 
 
 

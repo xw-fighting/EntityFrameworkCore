@@ -45,21 +45,21 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
             if (FinalProjectionPath.Count > 0)
             {
-                //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
-                var body = (Expression)parameter;
-                foreach (var finalProjectionPathElement in FinalProjectionPath)
-                {
-                    body = Field(body, finalProjectionPathElement);
-                }
+                //    //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
+                //    var body = (Expression)parameter;
+                //    foreach (var finalProjectionPathElement in FinalProjectionPath)
+                //    {
+                //        body = Field(body, finalProjectionPathElement);
+                //    }
 
-                var lambda = Lambda(body, parameter);
-                var method = _selectMethodInfo.MakeGenericMethod(parameter.Type, body.Type);
+                //    var lambda = Lambda(body, parameter);
+                //    var method = _selectMethodInfo.MakeGenericMethod(parameter.Type, body.Type);
 
-                result = Call(method, Operand, lambda);
+                //    result = Call(method, Operand, lambda);
             }
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
-            {
+            { 
                 var toOrderedMethodInfo = typeof(NavigationExpansionExpression).GetMethod(nameof(NavigationExpansionExpression.ToOrdered)).MakeGenericMethod(parameter.Type);
 
                 result = Call(toOrderedMethodInfo, result);
@@ -81,7 +81,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public LambdaExpression AppliedSelector { get; }
         public LambdaExpression PendingSelector { get; }
 
-        public List<NavigationPathNode> FoundNavigations { get; }
+        public List<NavigationTreeNode> FoundNavigations { get; }
 
         public List<string> FinalProjectionPath { get; }
 
@@ -93,7 +93,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
             LambdaExpression appliedSelector,
             LambdaExpression pendingSelector,
-            List<NavigationPathNode> foundNavigations,
+            List<NavigationTreeNode> foundNavigations,
             List<string> finalProjectionPath,
             Type returnType)
         {
