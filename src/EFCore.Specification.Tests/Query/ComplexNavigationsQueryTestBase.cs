@@ -5454,6 +5454,11 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             using (var ctx = CreateContext())
             {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1 })
+                    .Distinct()
+                    .Where(x => x.foo.OneToOne_Optional_PK1.Name != "Foo");
+
                 //var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo").Where(l1 => l1.Id != 1);//.Select(l1 => l1.Id);
 
                 //var query = from l1 in ctx.LevelOne
@@ -5475,12 +5480,17 @@ namespace Microsoft.EntityFrameworkCore.Query
 
 
 
-                var query = ctx.LevelOne
-                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
-                    .Where(x => x.foo.OneToOne_Optional_FK2.Name != "foo")
-                    .Where(x => x.foo.OneToOne_Required_FK2.Name != "bar")
-                    .OrderBy(x => x.foo.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Id);
-                    //.OrderBy(x => x.foo.OneToOne_Optional_FK2.Id);
+                //var query = ctx.LevelOne
+                //    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "foo")
+                //    .Where(l1 => l1.OneToOne_Required_FK1.Id != 1);
+
+
+                //var query = ctx.LevelOne
+                //    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                //    .Where(x => x.foo.OneToOne_Optional_FK2.Name != "foo")
+                //    .Where(x => x.foo.OneToOne_Required_FK2.Name != "bar")
+                //    .OrderBy(x => x.foo.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Id);
+                //    //.OrderBy(x => x.foo.OneToOne_Optional_FK2.Id);
 
 
 
@@ -5556,6 +5566,61 @@ namespace Microsoft.EntityFrameworkCore.Query
                 //            join l3 in ctx.LevelThree on (int?)l2.Id equals EF.Property<int?>(l3, "Level2_Optional_Id")
                 //            where l3.Name != "Foo"
                 //            select l1;
+
+                var result = query.ToList();
+            }
+        }
+
+
+        [ConditionalFact]
+        public virtual void Nav2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    .Where(x => x.foo.OneToOne_Optional_PK2.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1 })
+                    .Where(x => x.foo.OneToOne_Optional_PK1.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    .Select(x => new { bar = x.foo.OneToOne_Optional_PK2 })
+                    .Where(xx => xx.bar.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav5()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    .Distinct()
+                    .Where(x => x.foo.OneToOne_Optional_PK2.Name != "Foo");
 
                 var result = query.ToList();
             }

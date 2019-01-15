@@ -956,7 +956,14 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                         if (GenerateUniqueQsreIds)
                         {
                             var index = VisitedQuerySources.IndexOf(qsre.ReferencedQuerySource);
-                            StringBuilder.Append("[" + qsre.ReferencedQuerySource.ItemName + "{" + index + "}]");
+                            if (index == -1)
+                            {
+                                StringBuilder.Append("[" + HighlightLeft + qsre.ReferencedQuerySource.ItemName + "{" + index + "}" + HighlightRight + "]");
+                            }
+                            else
+                            {
+                                StringBuilder.Append("[" + qsre.ReferencedQuerySource.ItemName + "{" + index + "}]");
+                            }
                         }
                         else
                         {

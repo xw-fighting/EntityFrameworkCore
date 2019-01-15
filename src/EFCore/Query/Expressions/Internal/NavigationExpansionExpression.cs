@@ -42,20 +42,22 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
                 result = Call(pendingSelectMathod, result, PendingSelector);
                 parameter = Parameter(result.Type.GetGenericArguments()[0]);
             }
-
-            if (FinalProjectionPath.Count > 0)
+            else if (FinalProjectionPath.Count > 0)
             {
-                //    //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
-                //    var body = (Expression)parameter;
-                //    foreach (var finalProjectionPathElement in FinalProjectionPath)
-                //    {
-                //        body = Field(body, finalProjectionPathElement);
-                //    }
+                // TODO: is this correct? do we only need to apply the path if no pending selector is present?
+                // maybe this can be unified somehow?!
 
-                //    var lambda = Lambda(body, parameter);
-                //    var method = _selectMethodInfo.MakeGenericMethod(parameter.Type, body.Type);
+                //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
+                var body = (Expression)parameter;
+                foreach (var finalProjectionPathElement in FinalProjectionPath)
+                {
+                    body = Field(body, finalProjectionPathElement);
+                }
 
-                //    result = Call(method, Operand, lambda);
+                var lambda = Lambda(body, parameter);
+                var method = _selectMethodInfo.MakeGenericMethod(parameter.Type, body.Type);
+
+                result = Call(method, Operand, lambda);
             }
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
@@ -72,8 +74,10 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             
         public Expression Operand { get; }
 
-        public ParameterExpression FirstSelectorParameter { get; } // parameter of first selector - this will be the root of all the navigations after selectors are applied to the current lambda
-        public ParameterExpression CurrentParameter { get; } // parameter of the current lambda 
+        //public ParameterExpression FirstSelectorParameter { get; } // parameter of first selector - this will be the root of all the navigations after selectors are applied to the current lambda
+
+        //public ParameterExpression CurrentLambdaParameter { get; } // parameter of the current lambda 
+        public ParameterExpression CurrentParameter { get; }
 
         public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
         public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
@@ -87,7 +91,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public NavigationExpansionExpression(
             Expression operand,
-            ParameterExpression firstSelectorParameter,
+            //ParameterExpression firstSelectorParameter,
+            //ParameterExpression currentLambdaParameter,
             ParameterExpression currentParameter,
             List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
             List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
@@ -98,7 +103,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             Type returnType)
         {
             Operand = operand;
-            FirstSelectorParameter = firstSelectorParameter;
+            //FirstSelectorParameter = firstSelectorParameter;
+            //CurrentLambdaParameter = currentLambdaParameter;
             CurrentParameter = currentParameter;
             TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
             EntityTypeAccessorMapping = entityTypeAccessorMapping;

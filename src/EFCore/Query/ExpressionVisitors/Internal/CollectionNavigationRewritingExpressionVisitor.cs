@@ -103,7 +103,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                             outerKeyAccess,
                             innerKeyAccess,
                             outerExpression,
-                            navigationBindingExpression.Root,
+                            navigationBindingExpression.RootParameter,
                             navigationBindingExpression.Navigations),
                         innerParameter);
 
