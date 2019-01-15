@@ -12,11 +12,12 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Internal;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.Expressions;
-using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.EntityFrameworkCore.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Query.Sql;
+using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Update;
@@ -68,11 +69,9 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
                 { typeof(IRelationalValueBufferFactoryFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IMaterializerFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IConditionalRemovingExpressionVisitorFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
-                { typeof(IExpressionFragmentTranslator), new ServiceCharacteristics(ServiceLifetime.Singleton) },
+                { typeof(ISelectExpressionFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(ISqlTranslatingExpressionVisitorFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IUpdateSqlGenerator), new ServiceCharacteristics(ServiceLifetime.Singleton) },
-                { typeof(IMemberTranslator), new ServiceCharacteristics(ServiceLifetime.Singleton) },
-                { typeof(ICompositeMethodCallTranslator), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IQuerySqlGeneratorFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IRelationalTransactionFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IRelationalCommandBuilderFactory), new ServiceCharacteristics(ServiceLifetime.Scoped) },
@@ -93,8 +92,16 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
                 { typeof(IHistoryRepository), new ServiceCharacteristics(ServiceLifetime.Scoped) },
                 { typeof(INamedConnectionStringResolver), new ServiceCharacteristics(ServiceLifetime.Scoped) },
                 { typeof(IRelationalTypeMappingSourcePlugin), new ServiceCharacteristics(ServiceLifetime.Singleton, multipleRegistrations: true) },
+
+                // New Query Pipeline
+                { typeof(IQuerySqlGeneratorFactory2), new ServiceCharacteristics(ServiceLifetime.Singleton) },
+                { typeof(IRelationalSqlTranslatingExpressionVisitorFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
+                { typeof(IMethodCallTranslatorProvider), new ServiceCharacteristics(ServiceLifetime.Singleton) },
+                { typeof(IMemberTranslatorProvider), new ServiceCharacteristics(ServiceLifetime.Singleton) },
+                { typeof(ISqlExpressionFactory), new ServiceCharacteristics(ServiceLifetime.Singleton) },
                 { typeof(IMethodCallTranslatorPlugin), new ServiceCharacteristics(ServiceLifetime.Singleton, multipleRegistrations: true) },
-                { typeof(IMemberTranslatorPlugin), new ServiceCharacteristics(ServiceLifetime.Singleton, multipleRegistrations: true) }
+                { typeof(IMemberTranslatorPlugin), new ServiceCharacteristics(ServiceLifetime.Singleton, multipleRegistrations: true) },
+
             };
 
         /// <summary>
@@ -164,22 +171,29 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             TryAdd<IEntityQueryModelVisitorFactory, RelationalQueryModelVisitorFactory>();
             TryAdd<IProjectionExpressionVisitorFactory, RelationalProjectionExpressionVisitorFactory>();
             TryAdd<ICompiledQueryCacheKeyGenerator, RelationalCompiledQueryCacheKeyGenerator>();
-            TryAdd<IExpressionFragmentTranslator, RelationalCompositeExpressionFragmentTranslator>();
             TryAdd<ISqlTranslatingExpressionVisitorFactory, SqlTranslatingExpressionVisitorFactory>();
             TryAdd<INamedConnectionStringResolver, NamedConnectionStringResolver>();
             TryAdd<ReLinq.IEvaluatableExpressionFilter, ReLinqRelationalEvaluatableExpressionFilter>();
             TryAdd<IEvaluatableExpressionFilter, RelationalEvaluatableExpressionFilter>();
             TryAdd<IRelationalTransactionFactory, RelationalTransactionFactory>();
 
+            // New Query pipeline
+            TryAdd<IQuerySqlGeneratorFactory2, QuerySqlGeneratorFactory2>();
+            TryAdd<IShapedQueryCompilingExpressionVisitorFactory, RelationalShapedQueryCompilingExpressionVisitorFactory>();
+            TryAdd<IQueryableMethodTranslatingExpressionVisitorFactory, RelationalQueryableMethodTranslatingExpressionVisitorFactory>();
+            TryAdd<IMethodCallTranslatorProvider, RelationalMethodCallTranslatorProvider>();
+            TryAdd<IMemberTranslatorProvider, RelationalMemberTranslatorProvider>();
+            TryAdd<IEntityQueryableTranslatorFactory, RelationalEntityQueryableTranslatorFactory>();
+            TryAdd<IShapedQueryOptimizerFactory, RelationalShapedQueryOptimizerFactory>();
+            TryAdd<IRelationalSqlTranslatingExpressionVisitorFactory, RelationalSqlTranslatingExpressionVisitorFactory>();
+            TryAdd<ISqlExpressionFactory, SqlExpressionFactory>();
+
             ServiceCollectionMap.GetInfrastructure()
-                .AddDependencySingleton<RelationalCompositeMemberTranslatorDependencies>()
                 .AddDependencySingleton<RelationalSqlGenerationHelperDependencies>()
                 .AddDependencySingleton<RelationalTypeMappingSourceDependencies>()
-                .AddDependencySingleton<RelationalCompositeExpressionFragmentTranslatorDependencies>()
                 .AddDependencySingleton<RelationalModelValidatorDependencies>()
                 .AddDependencySingleton<UpdateSqlGeneratorDependencies>()
                 .AddDependencySingleton<QuerySqlGeneratorDependencies>()
-                .AddDependencySingleton<RelationalCompositeMethodCallTranslatorDependencies>()
                 .AddDependencySingleton<MigrationsAnnotationProviderDependencies>()
                 .AddDependencySingleton<SqlTranslatingExpressionVisitorDependencies>()
                 .AddDependencySingleton<ParameterNameGeneratorDependencies>()

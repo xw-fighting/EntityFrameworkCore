@@ -12,7 +12,6 @@ using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.Expressions;
 using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
-using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
@@ -42,9 +41,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
                 { ExpressionType.NotEqual, ExpressionType.Equal }
             };
 
-        private readonly IExpressionFragmentTranslator _compositeExpressionFragmentTranslator;
-        private readonly ICompositeMethodCallTranslator _methodCallTranslator;
-        private readonly IMemberTranslator _memberTranslator;
         private readonly RelationalQueryModelVisitor _queryModelVisitor;
         private readonly IRelationalTypeMappingSource _typeMappingSource;
         private readonly SelectExpression _targetSelectExpression;
@@ -73,9 +69,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
             Check.NotNull(dependencies, nameof(dependencies));
             Check.NotNull(queryModelVisitor, nameof(queryModelVisitor));
 
-            _compositeExpressionFragmentTranslator = dependencies.CompositeExpressionFragmentTranslator;
-            _methodCallTranslator = dependencies.MethodCallTranslator;
-            _memberTranslator = dependencies.MemberTranslator;
             _typeMappingSource = dependencies.TypeMappingSource;
             _queryModelVisitor = queryModelVisitor;
             _targetSelectExpression = targetSelectExpression;
@@ -103,14 +96,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
         /// </returns>
         public override Expression Visit(Expression expression)
         {
-            var translatedExpression = _compositeExpressionFragmentTranslator.Translate(expression);
-
-            if (translatedExpression != null
-                && translatedExpression != expression)
-            {
-                return Visit(translatedExpression);
-            }
-
             // ReSharper disable once ConditionIsAlwaysTrueOrFalse
             if (expression != null
                 && (expression.NodeType == ExpressionType.Convert
@@ -645,15 +630,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
                             ? Expression.Call(operand, methodCallExpression.Method, arguments)
                             : Expression.Call(methodCallExpression.Method, arguments);
 
-                    var translatedExpression = _methodCallTranslator.Translate(
-                        boundExpression,
-                        compilationContext.Model,
-                        compilationContext.Loggers.GetLogger<DbLoggerCategory.Query>());
-
-                    if (translatedExpression != null)
-                    {
-                        return translatedExpression;
-                    }
                 }
             }
 
@@ -723,13 +699,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
                     {
                         newMemberExpression = memberExpression;
                     }
-
-                    var translatedExpression = _memberTranslator.Translate(newMemberExpression);
-
-                    if (translatedExpression != null)
-                    {
-                        return translatedExpression;
-                    }
                 }
             }
 
@@ -777,7 +746,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
             TExpression sourceExpression,
             Func<TExpression, RelationalQueryModelVisitor, Func<IProperty, IQuerySource, SelectExpression, Expression>, Expression> binder)
         {
-            Expression BindPropertyToSelectExpression(
+            Expression bindPropertyToSelectExpression(
                 IProperty property, IQuerySource querySource, SelectExpression selectExpression)
                 => selectExpression.BindProperty(
                     property,
@@ -786,7 +755,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
             var boundExpression = binder(
                 sourceExpression, _queryModelVisitor, (property, querySource, selectExpression) =>
                 {
-                    var boundPropertyExpression = BindPropertyToSelectExpression(property, querySource, selectExpression);
+                    var boundPropertyExpression = bindPropertyToSelectExpression(property, querySource, selectExpression);
 
                     if (_targetSelectExpression != null
                         && selectExpression != _targetSelectExpression)
@@ -808,7 +777,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
 
             while (outerQueryModelVisitor != null && canBindToOuterQueryModelVisitor)
             {
-                boundExpression = binder(sourceExpression, outerQueryModelVisitor, BindPropertyToSelectExpression);
+                boundExpression = binder(sourceExpression, outerQueryModelVisitor, bindPropertyToSelectExpression);
 
                 if (boundExpression != null)
                 {

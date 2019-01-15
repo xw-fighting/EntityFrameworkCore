@@ -29,7 +29,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         Expression CreateReadValueExpression(
             [NotNull] Expression valueBuffer,
             [NotNull] Type type,
-            int index);
+            int index,
+            [CanBeNull] IPropertyBase property);
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -37,6 +38,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         /// </summary>
         Expression CreateMaterializeExpression(
             [NotNull] IEntityType entityType,
+            [NotNull] string entityInstanceName,
             [NotNull] Expression materializationExpression,
             [CanBeNull] int[] indexMap = null);
 

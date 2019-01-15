@@ -380,23 +380,6 @@ namespace Microsoft.EntityFrameworkCore.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
-        public static ConstantExpression GenerateDefaultValueConstantExpression(this Type type)
-        {
-            Check.NotNull(type, nameof(type));
-
-            return (ConstantExpression)_generateDefaultValueConstantExpressionInternalMethod.MakeGenericMethod(type).Invoke(null, Array.Empty<object>());
-        }
-
-        private static readonly MethodInfo _generateDefaultValueConstantExpressionInternalMethod =
-            typeof(ExpressionExtensions).GetTypeInfo().GetDeclaredMethod(nameof(GenerateDefaultValueConstantExpressionInternal));
-
-        private static ConstantExpression GenerateDefaultValueConstantExpressionInternal<TDefault>()
-            => Expression.Constant(default(TDefault));
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
         public static Expression Assign(
             [NotNull] this MemberExpression memberExpression,
             [NotNull] Expression valueExpression)

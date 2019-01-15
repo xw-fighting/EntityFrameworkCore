@@ -117,7 +117,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
             var materializer
                 = _entityMaterializerSource
                     .CreateMaterializeExpression(
-                        firstEntityType, materializationContextParameter);
+                        firstEntityType, "instance", materializationContextParameter);
 
             if (concreteEntityTypes.Count == 1)
             {
@@ -145,7 +145,8 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                             .CreateReadValueExpression(
                                 Expression.Call(materializationContextParameter, MaterializationContext.GetValueBufferMethod),
                                 discriminatorProperty.ClrType,
-                                indexMap[discriminatorProperty.GetIndex()])),
+                                indexMap[discriminatorProperty.GetIndex()],
+                                discriminatorProperty)),
                     Expression.IfThenElse(
                         Expression.Equal(discriminatorValueVariable, firstDiscriminatorValue),
                         Expression.Return(returnLabelTarget, materializer),
@@ -196,7 +197,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 materializer
                     = _entityMaterializerSource
                         .CreateMaterializeExpression(
-                            concreteEntityType, materializationContextParameter);
+                            concreteEntityType, "instance", materializationContextParameter);
 
                 blockExpressions[1]
                     = Expression.IfThenElse(

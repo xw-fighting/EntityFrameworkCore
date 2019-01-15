@@ -4,14 +4,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
-using Microsoft.EntityFrameworkCore.Query.Expressions;
-using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
+using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline;
+using Microsoft.EntityFrameworkCore.Relational.Query.Pipeline.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Metadata.Internal
@@ -21,7 +20,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
     ///     directly from your code. This API may change or be removed in future releases.
     /// </summary>
     // Issue#11266 This type is being used by provider code. Do not break.
-    public class DbFunction : IMutableDbFunction, IMethodCallTranslator
+    public class DbFunction : IMutableDbFunction
     {
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -187,20 +186,6 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
-        public virtual Func<IReadOnlyCollection<Expression>, Expression> Translation { get; set; }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        Expression IMethodCallTranslator.Translate(
-            MethodCallExpression methodCallExpression,
-            IDiagnosticsLogger<DbLoggerCategory.Query> logger)
-        {
-            Check.NotNull(methodCallExpression, nameof(methodCallExpression));
-
-            return Translation?.Invoke(methodCallExpression.Arguments)
-                   ?? new SqlFunctionExpression(FunctionName, MethodInfo.ReturnType, Schema, methodCallExpression.Arguments);
-        }
+        public virtual Func<IReadOnlyCollection<SqlExpression>, SqlExpression> Translation { get; set; }
     }
 }
