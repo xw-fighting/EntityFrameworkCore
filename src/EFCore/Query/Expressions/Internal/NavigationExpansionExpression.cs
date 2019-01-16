@@ -14,6 +14,17 @@ using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 {
+    public class NavigationExpansionExpressionState
+    {
+        //public Expression Source { get; set; }
+        public ParameterExpression CurrentParameter { get; set; }
+        public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; set; } = new List<(List<INavigation> from, List<string> to)>();
+        public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; set; } = new List<(List<string> path, IEntityType entityType)>();
+        public LambdaExpression PendingSelector { get; set; }
+        public List<NavigationTreeNode> FoundNavigations { get; set; } = new List<NavigationTreeNode>();
+        public List<string> FinalProjectionPath { get; set; } = new List<string>();
+    }
+
     public class NavigationExpansionExpression : Expression, IPrintable
     {
         private MethodInfo _selectMethodInfo
@@ -26,8 +37,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public override bool CanReduce => true;
         public override Expression Reduce()
         {
-            if (FinalProjectionPath.Count == 0
-                && PendingSelector == null)
+            if (State.FinalProjectionPath.Count == 0
+                && (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0]))
             {
                 return Operand;
             }
@@ -36,20 +47,20 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
-            if (PendingSelector != null)
+            if (State.PendingSelector != null)
             {
-                var pendingSelectMathod = _selectMethodInfo.MakeGenericMethod(parameter.Type, PendingSelector.Body.Type);
-                result = Call(pendingSelectMathod, result, PendingSelector);
+                var pendingSelectMathod = _selectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
+                result = Call(pendingSelectMathod, result, State.PendingSelector);
                 parameter = Parameter(result.Type.GetGenericArguments()[0]);
             }
-            else if (FinalProjectionPath.Count > 0)
+            else if (State.FinalProjectionPath.Count > 0)
             {
                 // TODO: is this correct? do we only need to apply the path if no pending selector is present?
                 // maybe this can be unified somehow?!
 
                 //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
                 var body = (Expression)parameter;
-                foreach (var finalProjectionPathElement in FinalProjectionPath)
+                foreach (var finalProjectionPathElement in State.FinalProjectionPath)
                 {
                     body = Field(body, finalProjectionPathElement);
                 }
@@ -73,33 +84,39 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         }
             
         public Expression Operand { get; }
-        public ParameterExpression CurrentParameter { get; }
 
-        public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
-        public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
 
-        public LambdaExpression PendingSelector { get; }
+        public NavigationExpansionExpressionState State { get; private set; }
 
-        public List<NavigationTreeNode> FoundNavigations { get; }
-        public List<string> FinalProjectionPath { get; }
+        //public ParameterExpression CurrentParameter { get; }
+
+        //public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
+        //public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
+
+        //public LambdaExpression PendingSelector { get; }
+
+        //public List<NavigationTreeNode> FoundNavigations { get; }
+        //public List<string> FinalProjectionPath { get; }
 
         public NavigationExpansionExpression(
             Expression operand,
-            ParameterExpression currentParameter,
-            List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
-            List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
-            LambdaExpression pendingSelector,
-            List<NavigationTreeNode> foundNavigations,
-            List<string> finalProjectionPath,
+            NavigationExpansionExpressionState state,
+            //ParameterExpression currentParameter,
+            //List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
+            //List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
+            //LambdaExpression pendingSelector,
+            //List<NavigationTreeNode> foundNavigations,
+            //List<string> finalProjectionPath,
             Type returnType)
         {
             Operand = operand;
-            CurrentParameter = currentParameter;
-            TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
-            EntityTypeAccessorMapping = entityTypeAccessorMapping;
-            PendingSelector = pendingSelector;
-            FoundNavigations = foundNavigations;
-            FinalProjectionPath = finalProjectionPath;
+            State = state;
+            //CurrentParameter = currentParameter;
+            //TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
+            //EntityTypeAccessorMapping = entityTypeAccessorMapping;
+            //PendingSelector = pendingSelector;
+            //FoundNavigations = foundNavigations;
+            //FinalProjectionPath = finalProjectionPath;
             _returnType = returnType;
         }
 

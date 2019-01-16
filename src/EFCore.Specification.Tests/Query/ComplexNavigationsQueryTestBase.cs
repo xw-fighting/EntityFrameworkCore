@@ -5625,5 +5625,18 @@ namespace Microsoft.EntityFrameworkCore.Query
                 var result = query.ToList();
             }
         }
+
+        [ConditionalFact]
+        public virtual void Nav6()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Foo")
+                    .Where(l1 => l1.OneToMany_Optional1.Count >= 0);
+
+                var result = query.ToList();
+            }
+        }
     }
 }

@@ -4090,6 +4090,21 @@ WHERE ([l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2].[Name] <> N'Foo') OR [l1
                 @"");
         }
 
+        public override void Nav6()
+        {
+            base.Nav6();
+
+            AssertSql(
+                @"SELECT [l1].[Id], [l1].[Date], [l1].[Name], [l1].[OneToMany_Optional_Self_Inverse1Id], [l1].[OneToMany_Required_Self_Inverse1Id], [l1].[OneToOne_Optional_Self1Id]
+FROM [LevelOne] AS [l1]
+LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_PK1] ON [l1].[Id] = [l1.OneToOne_Optional_PK1].[OneToOne_Optional_PK_Inverse2Id]
+WHERE (([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK1].[Name] IS NULL) AND ((
+    SELECT COUNT(*)
+    FROM [LevelTwo] AS [l]
+    WHERE [l1].[Id] = [l].[OneToMany_Optional_Inverse2Id]
+) >= 0)");
+        }
+
         private void AssertSql(params string[] expected)
         {
             Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
