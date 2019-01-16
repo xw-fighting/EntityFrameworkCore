@@ -73,42 +73,30 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         }
             
         public Expression Operand { get; }
-
-        //public ParameterExpression FirstSelectorParameter { get; } // parameter of first selector - this will be the root of all the navigations after selectors are applied to the current lambda
-
-        //public ParameterExpression CurrentLambdaParameter { get; } // parameter of the current lambda 
         public ParameterExpression CurrentParameter { get; }
 
         public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
         public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
 
-        public LambdaExpression AppliedSelector { get; }
         public LambdaExpression PendingSelector { get; }
 
         public List<NavigationTreeNode> FoundNavigations { get; }
-
         public List<string> FinalProjectionPath { get; }
 
         public NavigationExpansionExpression(
             Expression operand,
-            //ParameterExpression firstSelectorParameter,
-            //ParameterExpression currentLambdaParameter,
             ParameterExpression currentParameter,
             List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
             List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
-            LambdaExpression appliedSelector,
             LambdaExpression pendingSelector,
             List<NavigationTreeNode> foundNavigations,
             List<string> finalProjectionPath,
             Type returnType)
         {
             Operand = operand;
-            //FirstSelectorParameter = firstSelectorParameter;
-            //CurrentLambdaParameter = currentLambdaParameter;
             CurrentParameter = currentParameter;
             TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
             EntityTypeAccessorMapping = entityTypeAccessorMapping;
-            AppliedSelector = appliedSelector;
             PendingSelector = pendingSelector;
             FoundNavigations = foundNavigations;
             FinalProjectionPath = finalProjectionPath;
