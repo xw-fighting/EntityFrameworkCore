@@ -4105,6 +4105,14 @@ WHERE (([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK
 ) >= 0)");
         }
 
+        public override void Nav7()
+        {
+            base.Nav7();
+
+            AssertSql(
+                @"");
+        }
+
         private void AssertSql(params string[] expected)
         {
             Fixture.TestSqlLoggerFactory.AssertBaseline(expected);

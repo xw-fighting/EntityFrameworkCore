@@ -5638,5 +5638,21 @@ namespace Microsoft.EntityFrameworkCore.Query
                 var result = query.ToList();
             }
         }
+
+        [ConditionalFact]
+        public virtual void Nav7()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                    .Join(
+                        ctx.LevelTwo.Where(l2 => l2.OneToOne_Optional_FK2.Name != "Bar"),
+                        o => o.OneToOne_Optional_PK1.Id,
+                        i => i.OneToOne_Optional_PK2.Id,
+                        (oo, ii) => new { Id1 = oo.OneToOne_Required_FK1.Id, Id2 = ii.OneToOne_Required_PK2.Id });
+
+                var result = query.ToList();
+            }
+        }
     }
 }
