@@ -5627,6 +5627,22 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         [ConditionalFact]
+        public virtual void Nav55()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
+                    //.Select(x => new { bar = x.foo })
+                    .Select(x => new { baz = new { bar = x.foo.OneToOne_Optional_PK2 } })
+                    //.Distinct()
+                    .Where(xxx => xxx.baz.bar.OneToOne_Required_PK3.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
         public virtual void Nav6()
         {
             using (var ctx = CreateContext())

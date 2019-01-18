@@ -17,9 +17,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
     public class NavigationExpansionExpressionState
     {
         public ParameterExpression CurrentParameter { get; set; }
-        public List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> NavigationExpansionMapping = new List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)>();
-        //public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; set; } = new List<(List<INavigation> from, List<string> to)>();
-        //public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; set; } = new List<(List<string> path, IEntityType entityType)>();
+        public List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> NavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
         public LambdaExpression PendingSelector { get; set; }
         public List<NavigationTreeNode> FoundNavigations { get; set; } = new List<NavigationTreeNode>();
         public List<string> FinalProjectionPath { get; set; } = new List<string>();

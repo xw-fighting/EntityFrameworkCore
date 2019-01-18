@@ -94,20 +94,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     public class NavigationPropertyBindingExpressionVisitor2 : ExpressionVisitor
     {
         private ParameterExpression _rootParameter;
-        private List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
-        //private List<(List<INavigation> from, List<string> to)> _transparentIdentifierAccessorMapping;
-        //private List<(List<string> path, IEntityType entityType)> _entityTypeAccessorMapping;
+        private List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
 
         public NavigationPropertyBindingExpressionVisitor2(
             ParameterExpression rootParameter,
-            List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping
-            /*List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
-            List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping*/)
+            List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping)
         {
             _rootParameter = rootParameter;
             _navigationExpansionMapping = navigationExpansionMapping;
-            //_transparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
-            //_entityTypeAccessorMapping = entityTypeAccessorMapping;
         }
 
         //private (ParameterExpression rootParameter, List<INavigation> navigations) TryFindMatchingTransparentIdentifierAccess(
@@ -172,7 +166,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private (ParameterExpression rootParameter, IEntityType rootEntityType, List<INavigation> navigations) TryFindMatchingNavigationExpansionMapping(
             Expression expression,
-            List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMappingCandidates)
+            List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMappingCandidates)
         {
             if (expression is ParameterExpression parameterExpression
                 && (parameterExpression == _rootParameter || _rootParameter == null))
@@ -188,7 +182,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             if (expression is MemberExpression memberExpression)
             {
                 var matchingCandidates = navigationExpansionMappingCandidates.Where(m => m.path.Any() && m.path.Last() == memberExpression.Member.Name);
-                var newCandidates = matchingCandidates.Select(mc => (path: mc.path.Take(mc.path.Count - 1).ToList(), mc.rootEntityType, mc.navigations.ToList())).ToList();
+                var newCandidates = matchingCandidates.Select(mc => (
+                    path: mc.path.Take(mc.path.Count - 1).ToList(),
+                    initialPath: mc.initialPath.ToList(),//.Count == mc.path.Count ? mc.initialPath.Take(mc.initialPath.Count - 1).ToList() : mc.initialPath.ToList(),
+                    mc.rootEntityType,
+                    mc.navigations.ToList())).ToList();
+
                 if (newCandidates.Any())
                 {
                     var result = TryFindMatchingNavigationExpansionMapping(memberExpression.Expression, newCandidates);
@@ -636,28 +635,21 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         private class EntityTypeAccessorMappingGenerator : ExpressionVisitor
         {
             private ParameterExpression _rootParameter;
-            private List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
-            //private List<(List<INavigation> from, List<string> to)> _transparentIdentifierMapping;
-            //private List<(List<string> path, IEntityType entityType)> _originalEntityAccessorMapping;
+            private List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
             private List<string> _currentPath;
-
-            //public List<(List<string> path, IEntityType entityType)> NewEntityAccessorMapping { get; }
-            public List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> NewNavigationExpansionMapping { get; }
+            public List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> NewNavigationExpansionMapping { get; }
 
             public EntityTypeAccessorMappingGenerator(
                 ParameterExpression rootParameter,
-                List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping)
+                List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping)
 
                 //List<(List<INavigation> from, List<string> to)> transparentIdentifierMapping,
                 //List<(List<string> path, IEntityType entityType)> entityAccessorMapping)
             {
                 _rootParameter = rootParameter;
                 _navigationExpansionMapping = navigationExpansionMapping;
-                //_transparentIdentifierMapping = transparentIdentifierMapping;
-                //_originalEntityAccessorMapping = entityAccessorMapping;
                 _currentPath = new List<string>();
-                NewNavigationExpansionMapping = new List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)>();
-                //NewEntityAccessorMapping = new List<(List<string> path, IEntityType entityType)>();
+                NewNavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
             }
 
             // prune these nodes, we only want to look for entities accessible in the result
@@ -689,8 +681,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 {
                     if (navigationBindingExpression.RootParameter == _rootParameter)
                     {
-                        NewNavigationExpansionMapping.Add((path: _currentPath.ToList(), rootEntityType: navigationBindingExpression.EntityType, navigations: navigationBindingExpression.Navigations.ToList() /*new List<INavigation>()*/));
-                        //NewEntityAccessorMapping.Add((path: _currentPath.ToList(), entityType: navigationBindingExpression.EntityType));
+                        NewNavigationExpansionMapping.Add((path: _currentPath.ToList(), initialPath: _currentPath.ToList(), rootEntityType: navigationBindingExpression.EntityType, navigations: new List<INavigation>()/* navigationBindingExpression.Navigations.ToList()*/));
                     }
 
                     return navigationBindingExpression;
@@ -995,15 +986,23 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
 
-            var newNavigationExpansionMapping = new List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)>();
+            var newNavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
             foreach (var outerMappingEntry in outerResult.state.NavigationExpansionMapping)
             {
-                newNavigationExpansionMapping.Add((path: new[] { "Outer" }.Concat(outerMappingEntry.path).ToList(), outerMappingEntry.rootEntityType, outerMappingEntry.navigations ));
+                newNavigationExpansionMapping.Add((
+                    path: new[] { "Outer" }.Concat(outerMappingEntry.path).ToList(),
+                    initialPath: new[] { "Outer" }.Concat(outerMappingEntry.initialPath).ToList(),
+                    outerMappingEntry.rootEntityType,
+                    outerMappingEntry.navigations ));
             }
 
             foreach (var innerMappingEntry in innerResult.state.NavigationExpansionMapping)
             {
-                newNavigationExpansionMapping.Add((path: new[] { "Inner" }.Concat(innerMappingEntry.path).ToList(), innerMappingEntry.rootEntityType, innerMappingEntry.navigations));
+                newNavigationExpansionMapping.Add((
+                    path: new[] { "Inner" }.Concat(innerMappingEntry.path).ToList(),
+                    initialPath: new[] { "Inner" }.Concat(innerMappingEntry.initialPath).ToList(),
+                    innerMappingEntry.rootEntityType,
+                    innerMappingEntry.navigations));
             }
 
             //foreach (var outerMappingEntry in outerResult.state.TransparentIdentifierAccessorMapping)
@@ -1652,8 +1651,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 var elementType = constantExpression.Value.GetType().GetGenericArguments()[0];
                 var entityType = _model.FindEntityType(elementType);
 
-                var navigationExpansionMapping = new List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)>();
-                navigationExpansionMapping.Add((new List<string>(), entityType, new List<INavigation>()));
+                var navigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
+                navigationExpansionMapping.Add((new List<string>(), new List<string>(), entityType, new List<INavigation>()));
 
                 var result = new NavigationExpansionExpression(
                     constantExpression,
@@ -1729,7 +1728,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             IEntityType rootEntityType,
             List<INavigation> navigationPath,
             List<string> finalProjectionPath,
-            List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping,
+            List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping,
             LambdaExpression pendingSelector)
         {
             var path = navigationTree.GeneratePath();
@@ -1911,7 +1910,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 if (navigationPath.Count == 0
                     && !navigationExpansionMapping.Any(m => m.navigations.Count == 0))
                 {
-                    navigationExpansionMapping.Add((path: new List<string>(), rootEntityType, navigations: navigationPath.ToList()));
+                    navigationExpansionMapping.Add((path: new List<string>(), initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList()));
                 }
 
                 foreach (var navigationExpansionMappingElement in navigationExpansionMapping)
@@ -1927,7 +1926,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
 
                 navigationPath.Add(navigation);
-                navigationExpansionMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, rootEntityType, navigations: navigationPath.ToList() ));
+                navigationExpansionMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList() ));
 
                 finalProjectionPath.Add("Outer");
                 if (navigationTree.Optional)
@@ -2246,12 +2245,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     {
         private ParameterExpression _previousParameter;
         private ParameterExpression _newParameter;
-        private List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
+        private List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> _navigationExpansionMapping;
 
         public NavigationReplacingExpressionVisitor2(
             ParameterExpression previousParameter,
             ParameterExpression newParameter,
-            List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping)
+            List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping)
         {
             _previousParameter = previousParameter;
             _newParameter = newParameter;
