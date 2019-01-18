@@ -16,10 +16,10 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 {
     public class NavigationExpansionExpressionState
     {
-        //public Expression Source { get; set; }
         public ParameterExpression CurrentParameter { get; set; }
-        public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; set; } = new List<(List<INavigation> from, List<string> to)>();
-        public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; set; } = new List<(List<string> path, IEntityType entityType)>();
+        public List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)> NavigationExpansionMapping = new List<(List<string> path, IEntityType rootEntityType, List<INavigation> navigations)>();
+        //public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; set; } = new List<(List<INavigation> from, List<string> to)>();
+        //public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; set; } = new List<(List<string> path, IEntityType entityType)>();
         public LambdaExpression PendingSelector { get; set; }
         public List<NavigationTreeNode> FoundNavigations { get; set; } = new List<NavigationTreeNode>();
         public List<string> FinalProjectionPath { get; set; } = new List<string>();
@@ -85,38 +85,15 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             
         public Expression Operand { get; }
 
-
         public NavigationExpansionExpressionState State { get; private set; }
-
-        //public ParameterExpression CurrentParameter { get; }
-
-        //public List<(List<INavigation> from, List<string> to)> TransparentIdentifierAccessorMapping { get; }
-        //public List<(List<string> path, IEntityType entityType)> EntityTypeAccessorMapping { get; }
-
-        //public LambdaExpression PendingSelector { get; }
-
-        //public List<NavigationTreeNode> FoundNavigations { get; }
-        //public List<string> FinalProjectionPath { get; }
 
         public NavigationExpansionExpression(
             Expression operand,
             NavigationExpansionExpressionState state,
-            //ParameterExpression currentParameter,
-            //List<(List<INavigation> from, List<string> to)> transparentIdentifierAccessorMapping,
-            //List<(List<string> path, IEntityType entityType)> entityTypeAccessorMapping,
-            //LambdaExpression pendingSelector,
-            //List<NavigationTreeNode> foundNavigations,
-            //List<string> finalProjectionPath,
             Type returnType)
         {
             Operand = operand;
             State = state;
-            //CurrentParameter = currentParameter;
-            //TransparentIdentifierAccessorMapping = transparentIdentifierAccessorMapping;
-            //EntityTypeAccessorMapping = entityTypeAccessorMapping;
-            //PendingSelector = pendingSelector;
-            //FoundNavigations = foundNavigations;
-            //FinalProjectionPath = finalProjectionPath;
             _returnType = returnType;
         }
 
