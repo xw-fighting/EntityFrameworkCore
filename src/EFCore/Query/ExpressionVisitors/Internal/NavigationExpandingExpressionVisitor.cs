@@ -668,6 +668,65 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             _model = model;
         }
 
+        private class EntityTypeAccessorMappingGenerator2 : ExpressionVisitor
+        {
+            private ParameterExpression _rootParameter;
+            private List<string> _currentPath = new List<string>();
+
+            public EntityTypeAccessorMappingGenerator2(ParameterExpression rootParameter)
+            {
+                _rootParameter = rootParameter;
+            }
+
+            // prune these nodes, we only want to look for entities accessible in the result
+            protected override Expression VisitMember(MemberExpression memberExpression)
+                => memberExpression;
+
+            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+                => methodCallExpression;
+
+            protected override Expression VisitBinary(BinaryExpression binaryExpression)
+                => binaryExpression;
+
+            protected override Expression VisitNew(NewExpression newExpression)
+            {
+                // TODO: when constructing a DTO, there will be arguments present, but no members - is it correct to just skip in this case?
+                if (newExpression.Members != null)
+                {
+                    for (var i = 0; i < newExpression.Arguments.Count; i++)
+                    {
+                        _currentPath.Add(newExpression.Members[i].Name);
+                        Visit(newExpression.Arguments[i]);
+                        _currentPath.RemoveAt(_currentPath.Count - 1);
+                    }
+                }
+
+                return newExpression;
+            }
+
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+                {
+                    if (navigationBindingExpression.RootParameter == _rootParameter)
+                    {
+                        var sourceMapping = navigationBindingExpression.SourceMapping;
+                        sourceMapping.InitialPath = _currentPath.ToList(); 
+                        sourceMapping.RootEntityType = navigationBindingExpression.EntityType;
+                        sourceMapping.FoundNavigations = new List<NavigationTreeNode>();
+                        sourceMapping.TransparentIdentifierMapping = new List<(List<string> path, List<INavigation> navigations)>
+                        {
+                            (path: new List<string>(), navigations: new List<INavigation>())
+                        };
+                    }
+
+                    return extensionExpression;
+                }
+
+                return base.VisitExtension(extensionExpression);
+            }
+        }
+
         private class EntityTypeAccessorMappingGenerator : ExpressionVisitor
         {
             private ParameterExpression _rootParameter;
@@ -1620,11 +1679,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
                     var newSelector = nrev.Visit(boundSelector);
 
+                    var etamg = new EntityTypeAccessorMappingGenerator2(pendingSelectorParameter);
+                    etamg.Visit(boundSelector);
+
                     var selectorMethodInfo = QueryableSelectMethodInfo.MakeGenericMethod(
                         pendingSelectorParameter.Type,
                         ((LambdaExpression)newSelector).Body.Type);
 
                     var result = Expression.Call(selectorMethodInfo, navigationExpansionExpression.Operand, newSelector);
+
+                    state.PendingSelector = null;
+                    state.CurrentParameter = null;
 
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)

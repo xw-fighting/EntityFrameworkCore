@@ -5635,7 +5635,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
                     //.Select(x => new { bar = x.foo })
                     .Select(x => new { baz = new { bar = x.foo.OneToOne_Optional_PK2 } })
-                    //.Distinct()
+                    .Distinct()
                     .Where(xxx => xxx.baz.bar.OneToOne_Required_PK3.Name != "Foo");
 
                 var result = query.ToList();
