@@ -145,6 +145,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                         while (extractionPath.Count > 0)
                         {
                             var extractionPathElement = extractionPath.Pop();
+
+                            // HACK: sometimes QM will access Inner/Outer property of the QSRE that is itself a transparent identifier - we should just allow that
+                            if (!(result is NewExpression))
+                            {
+                                return memberExpression;
+                            }
+
                             var newExpression = (NewExpression)result;
 
                             if (extractionPathElement == "Outer")
@@ -169,12 +176,26 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 if (memberExpression.Member.Name == "Outer"
                     || memberExpression.Member.Name == "Inner")
                 {
-                    return ExtractFromTransparentIdentifier(memberExpression, new Stack<string>());
+                    var result = ExtractFromTransparentIdentifier(memberExpression, new Stack<string>());
+
+                    return result;
                 }
                 else
                 {
                     return base.VisitMember(memberExpression);
                 }
+            }
+
+            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+            {
+                if (methodCallExpression.Method.Name == "Property")
+                {
+
+                }
+
+                var result = base.VisitMethodCall(methodCallExpression);
+
+                return result;
             }
 
             protected override Expression VisitSubQuery(SubQueryExpression subQueryExpression)

@@ -209,9 +209,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             if (parameterExpression == _rootParameter
                 || _rootParameter == null)
             {
-                var sourceMapping = _sourceMappings.Where(sm => sm.InitialPath.Count == 0).SingleOrDefault();
-                if (sourceMapping != null
-                    && sourceMapping.RootEntityType.ClrType == parameterExpression.Type)
+                var sourceMapping = _sourceMappings.Where(sm => sm.RootEntityType.ClrType == parameterExpression.Type && sm.InitialPath.Count == 0).SingleOrDefault();
+                if (sourceMapping != null)
                 {
                     return new NavigationBindingExpression2(
                         parameterExpression,
@@ -222,7 +221,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
             }
 
-            return base.VisitParameter(parameterExpression);
+            return parameterExpression;//  base.VisitParameter(parameterExpression);
         }
     }
 
@@ -719,82 +718,104 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private Expression ProcessJoin(MethodCallExpression methodCallExpression)
         {
-            //var outerSource = Visit(methodCallExpression.Arguments[0]);
-            //var innerSource = Visit(methodCallExpression.Arguments[1]);
+            var outerSource = Visit(methodCallExpression.Arguments[0]);
+            var innerSource = Visit(methodCallExpression.Arguments[1]);
 
-            //var outerKeySelector = methodCallExpression.Arguments[2].UnwrapQuote();
-            //var innerKeySelector = methodCallExpression.Arguments[3].UnwrapQuote();
-            //var resultSelector = methodCallExpression.Arguments[4].UnwrapQuote();
+            var outerKeySelector = methodCallExpression.Arguments[2].UnwrapQuote();
+            var innerKeySelector = methodCallExpression.Arguments[3].UnwrapQuote();
+            var resultSelector = methodCallExpression.Arguments[4].UnwrapQuote();
 
-            //var outerState = new NavigationExpansionExpressionState
-            //{
-            //    CurrentParameter = outerKeySelector.Parameters[0]
-            //};
+            var outerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = outerKeySelector.Parameters[0]
+            };
 
-            //var innerState = new NavigationExpansionExpressionState
-            //{
-            //    CurrentParameter = innerKeySelector.Parameters[0]
-            //};
+            var innerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = innerKeySelector.Parameters[0]
+            };
 
-            //if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
-            //{
-            //    outerSource = outerNavigationExpansionExpression.Operand;
+            if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
+            {
+                outerSource = outerNavigationExpansionExpression.Operand;
 
-            //    // TODO: fix this!
-            //    var currentParameter = outerState.CurrentParameter;
-            //    outerState = outerNavigationExpansionExpression.State;
-            //    outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
-            //    outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
-            //}
+                // TODO: fix this!
+                var currentParameter = outerState.CurrentParameter;
+                outerState = outerNavigationExpansionExpression.State;
+                outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
+                outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+            }
 
-            //if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
-            //{
-            //    innerSource = innerNavigationExpansionExpression.Operand;
+            if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
+            {
+                innerSource = innerNavigationExpansionExpression.Operand;
 
-            //    // TODO: fix this!
-            //    var currentParameter = innerState.CurrentParameter;
-            //    innerState = innerNavigationExpansionExpression.State;
-            //    innerState.CurrentParameter = innerState.CurrentParameter ?? currentParameter;
-            //    innerState.PendingSelector = innerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
-            //}
+                // TODO: fix this!
+                var currentParameter = innerState.CurrentParameter;
+                innerState = innerNavigationExpansionExpression.State;
+                innerState.CurrentParameter = innerState.CurrentParameter ?? currentParameter;
+                innerState.PendingSelector = innerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+            }
 
-            //var combinedOuterKeySelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector, outerKeySelector);
-            //combinedOuterKeySelector = (LambdaExpression)Visit(combinedOuterKeySelector);
+            var combinedOuterKeySelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector, outerKeySelector);
+            combinedOuterKeySelector = (LambdaExpression)Visit(combinedOuterKeySelector);
 
-            //var combinedInnerKeySelector = ExpressionExtensions.CombineAndRemapLambdas(innerState.PendingSelector, innerKeySelector);
-            //combinedInnerKeySelector = (LambdaExpression)Visit(combinedInnerKeySelector);
+            var combinedInnerKeySelector = ExpressionExtensions.CombineAndRemapLambdas(innerState.PendingSelector, innerKeySelector);
+            combinedInnerKeySelector = (LambdaExpression)Visit(combinedInnerKeySelector);
 
-            //var outerResult = FindAndApplyNavigations(outerSource, combinedOuterKeySelector, outerState);
-            //var innerResult = FindAndApplyNavigations(innerSource, combinedInnerKeySelector, innerState);
+            var outerResult = FindAndApplyNavigations(outerSource, combinedOuterKeySelector, outerState);
+            var innerResult = FindAndApplyNavigations(innerSource, combinedInnerKeySelector, innerState);
 
-            //// remap result selector into transparent identifier
-            //var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(outerResult.state.CurrentParameter.Type, innerResult.state.CurrentParameter.Type);
+            // remap result selector into transparent identifier
+            var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(outerResult.state.CurrentParameter.Type, innerResult.state.CurrentParameter.Type);
 
-            //var transparentIdentifierCtorInfo
-            //    = resultType.GetTypeInfo().GetConstructors().Single();
+            var transparentIdentifierCtorInfo
+                = resultType.GetTypeInfo().GetConstructors().Single();
 
-            //var newResultSelector = Expression.Lambda(
-            //    Expression.New(transparentIdentifierCtorInfo, outerResult.state.CurrentParameter, innerResult.state.CurrentParameter),
-            //    outerResult.state.CurrentParameter,
-            //    innerResult.state.CurrentParameter);
+            var newResultSelector = Expression.Lambda(
+                Expression.New(transparentIdentifierCtorInfo, outerResult.state.CurrentParameter, innerResult.state.CurrentParameter),
+                outerResult.state.CurrentParameter,
+                innerResult.state.CurrentParameter);
 
-            //var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
-            //    outerResult.state.CurrentParameter.Type,
-            //    innerResult.state.CurrentParameter.Type,
-            //    outerResult.lambda.UnwrapQuote().Body.Type,
-            //    newResultSelector.Body.Type);
+            var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                outerResult.state.CurrentParameter.Type,
+                innerResult.state.CurrentParameter.Type,
+                outerResult.lambda.UnwrapQuote().Body.Type,
+                newResultSelector.Body.Type);
 
-            //var rewritten = Expression.Call(
-            //    newMethodInfo,
-            //    outerResult.source,
-            //    innerResult.source,
-            //    outerResult.lambda,
-            //    innerResult.lambda,
-            //    newResultSelector);
+            var rewritten = Expression.Call(
+                newMethodInfo,
+                outerResult.source,
+                innerResult.source,
+                outerResult.lambda,
+                innerResult.lambda,
+                newResultSelector);
 
-            //var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
+            var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
 
-            //var newNavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
+            var newNavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
+
+
+            foreach (var outerMappingEntry in outerResult.state.SourceMappings)
+            {
+                foreach (var outerTransparentIdentifierMapping in outerMappingEntry.TransparentIdentifierMapping)
+                {
+                    outerTransparentIdentifierMapping.path.Insert(0, "Outer");
+                }
+
+                //outerMappingEntry.InitialPath.Insert(0, "Outer");
+            }
+
+            foreach (var innerMappingEntry in innerResult.state.SourceMappings)
+            {
+                foreach (var innerTransparentIdentifierMapping in innerMappingEntry.TransparentIdentifierMapping)
+                {
+                    innerTransparentIdentifierMapping.path.Insert(0, "Inner");
+                }
+
+                //innerMappingEntry.InitialPath.Insert(0, "Inner");
+            }
+
             //foreach (var outerMappingEntry in outerResult.state.NavigationExpansionMapping)
             //{
             //    newNavigationExpansionMapping.Add((
@@ -813,50 +834,48 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             //        innerMappingEntry.navigations));
             //}
 
-            ////foreach (var outerMappingEntry in outerResult.state.TransparentIdentifierAccessorMapping)
-            ////{
-            ////    newTransparentIdentifierAccessorMapping.Add((outerMappingEntry.from, to: new[] { "Outer" }.Concat(outerMappingEntry.to).ToList()));
-            ////}
-
-            ////foreach (var innerMappingEntry in innerResult.state.TransparentIdentifierAccessorMapping)
-            ////{
-            ////    newTransparentIdentifierAccessorMapping.Add((innerMappingEntry.from, to: new[] { "Inner" }.Concat(innerMappingEntry.to).ToList()));
-            ////}
-
-            //var finalState = new NavigationExpansionExpressionState
+            //foreach (var outerMappingEntry in outerResult.state.TransparentIdentifierAccessorMapping)
             //{
-            //    PendingSelector = null,
-            //    CurrentParameter = transparentIdentifierParameter,
-            //    //EntityTypeAccessorMapping = new List<(List<string> path, IEntityType entityType)>(),
-            //    FinalProjectionPath = new List<string>(),
+            //    newTransparentIdentifierAccessorMapping.Add((outerMappingEntry.from, to: new[] { "Outer" }.Concat(outerMappingEntry.to).ToList()));
+            //}
 
-            //    FoundNavigations = outerResult.state.FoundNavigations.Concat(innerResult.state.FoundNavigations).ToList(), // ???
-            //    NavigationExpansionMapping = newNavigationExpansionMapping
-            //    //TransparentIdentifierAccessorMapping = newTransparentIdentifierAccessorMapping
-            //};
+            //foreach (var innerMappingEntry in innerResult.state.TransparentIdentifierAccessorMapping)
+            //{
+            //    newTransparentIdentifierAccessorMapping.Add((innerMappingEntry.from, to: new[] { "Inner" }.Concat(innerMappingEntry.to).ToList()));
+            //}
 
+            var finalState = new NavigationExpansionExpressionState
+            {
+                PendingSelector = null,
+                CurrentParameter = transparentIdentifierParameter,
+                FinalProjectionPath = new List<string>(),
+                SourceMappings = outerResult.state.SourceMappings.Concat(innerResult.state.SourceMappings).ToList()
 
-            //var fubar = new NavigationExpansionExpression(
-            //    rewritten,
-            //    finalState,
-            //    rewritten.Type);
+                //FoundNavigations = outerResult.state.FoundNavigations.Concat(innerResult.state.FoundNavigations).ToList(), // ???
+                //NavigationExpansionMapping = newNavigationExpansionMapping
+                //TransparentIdentifierAccessorMapping = newTransparentIdentifierAccessorMapping
+            };
 
+            var fubar = new NavigationExpansionExpression(
+                rewritten,
+                finalState,
+                rewritten.Type);
 
-            //var outerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Outer));
-            //var innerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Inner));
+            var outerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Outer));
+            var innerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Inner));
 
-            //var foo = ExpressionExtensions.CombineAndRemapLambdas(outerResult.state.PendingSelector, resultSelector, resultSelector.Parameters[0]);
-            //var foo2 = ExpressionExtensions.CombineAndRemapLambdas(innerResult.state.PendingSelector, foo, resultSelector.Parameters[1]);
+            var foo = ExpressionExtensions.CombineAndRemapLambdas(outerResult.state.PendingSelector, resultSelector, resultSelector.Parameters[0]);
+            var foo2 = ExpressionExtensions.CombineAndRemapLambdas(innerResult.state.PendingSelector, foo, resultSelector.Parameters[1]);
 
-            //var foo3 = new ExpressionReplacingVisitor(outerResult.state.CurrentParameter, outerAccess).Visit(foo2.Body);
-            //var foo4 = new ExpressionReplacingVisitor(innerResult.state.CurrentParameter, innerAccess).Visit(foo3);
+            var foo3 = new ExpressionReplacingVisitor(outerResult.state.CurrentParameter, outerAccess).Visit(foo2.Body);
+            var foo4 = new ExpressionReplacingVisitor(innerResult.state.CurrentParameter, innerAccess).Visit(foo3);
 
-            //var lambda = Expression.Lambda(foo4, transparentIdentifierParameter);
+            var lambda = Expression.Lambda(foo4, transparentIdentifierParameter);
 
-            //var select = QueryableSelectMethodInfo.MakeGenericMethod(transparentIdentifierParameter.Type, lambda.Body.Type);
-            //var fubaz = Expression.Call(select, fubar, lambda);
+            var select = QueryableSelectMethodInfo.MakeGenericMethod(transparentIdentifierParameter.Type, lambda.Body.Type);
+            var fubaz = Expression.Call(select, fubar, lambda);
 
-            //return Visit(fubaz);
+            return Visit(fubaz);
 
 
             //// append Select method representing the result selector of the Join operation
@@ -865,7 +884,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
 
 
-            return methodCallExpression;
+            //return methodCallExpression;
         }
 
         private class ExpressionReplacingVisitor  : ExpressionVisitor
@@ -1516,6 +1535,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                             result.source,
                             result.parameter,
                             sourceMapping,
+                            state.SourceMappings,
                             navigationTree,
                             new List<INavigation>(),
                             state.PendingSelector);
@@ -1540,246 +1560,247 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             return (result.source, lambda: newLambda, state: newState);
         }
 
-        private (Expression source, ParameterExpression parameter, LambdaExpression pendingSelector) AddNavigationJoin(
-            Expression sourceExpression,
-            ParameterExpression parameterExpression,
-            NavigationTreeNode navigationTree,
-            IEntityType rootEntityType,
-            List<INavigation> navigationPath,
-            List<string> finalProjectionPath,
-            List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping,
-            LambdaExpression pendingSelector)
-        {
-            var path = navigationTree.GeneratePath();
+        //private (Expression source, ParameterExpression parameter, LambdaExpression pendingSelector) AddNavigationJoin(
+        //    Expression sourceExpression,
+        //    ParameterExpression parameterExpression,
+        //    NavigationTreeNode navigationTree,
+        //    IEntityType rootEntityType,
+        //    List<INavigation> navigationPath,
+        //    List<string> finalProjectionPath,
+        //    List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> navigationExpansionMapping,
+        //    LambdaExpression pendingSelector)
+        //{
+        //    var path = navigationTree.GeneratePath();
 
-            if (!navigationExpansionMapping.Any(m => m.navigations.Count == path.Count && m.navigations.Zip(path, (o, i) => o.Name == i).All(r => r)))
-            {
-                var navigation = navigationTree.Navigation;
-                var sourceType = sourceExpression.Type.GetGenericArguments()[0];
+        //    if (!navigationExpansionMapping.Any(m => m.navigations.Count == path.Count && m.navigations.Zip(path, (o, i) => o.Name == i).All(r => r)))
+        //    {
+        //        var navigation = navigationTree.Navigation;
+        //        var sourceType = sourceExpression.Type.GetGenericArguments()[0];
 
-                // is this the right way to get EntityTypes?
-                var navigationTargetEntityType = navigation.IsDependentToPrincipal()
-                    ? navigation.ForeignKey.PrincipalEntityType
-                    : navigation.ForeignKey.DeclaringEntityType;
+        //        // is this the right way to get EntityTypes?
+        //        var navigationTargetEntityType = navigation.IsDependentToPrincipal()
+        //            ? navigation.ForeignKey.PrincipalEntityType
+        //            : navigation.ForeignKey.DeclaringEntityType;
 
-                var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(navigationTargetEntityType.ClrType);
-                var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(sourceType, navigationTargetEntityType.ClrType);
+        //        var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(navigationTargetEntityType.ClrType);
+        //        var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(sourceType, navigationTargetEntityType.ClrType);
 
-                var transparentIdentifierAccessorPath = navigationExpansionMapping.Where(
-                    m => m.navigations.Count == navigationPath.Count
-                        && m.navigations.Zip(navigationPath, (o, i) => o == i).All(r => r)).SingleOrDefault().path;
+        //        var transparentIdentifierAccessorPath = navigationExpansionMapping.Where(
+        //            m => m.navigations.Count == navigationPath.Count
+        //                && m.navigations.Zip(navigationPath, (o, i) => o == i).All(r => r)).SingleOrDefault().path;
 
-                var outerParameter = Expression.Parameter(sourceType, parameterExpression.Name);
-                var outerKeySelectorParameter = outerParameter;
-                var transparentIdentifierAccessorExpression = BuildTransparentIdentifierAccessorExpression(outerParameter, transparentIdentifierAccessorPath);
+        //        var outerParameter = Expression.Parameter(sourceType, parameterExpression.Name);
+        //        var outerKeySelectorParameter = outerParameter;
+        //        var transparentIdentifierAccessorExpression = BuildTransparentIdentifierAccessorExpression(outerParameter, transparentIdentifierAccessorPath);
 
-                var outerKeySelectorBody = CreateKeyAccessExpression(
-                    transparentIdentifierAccessorExpression,
-                    navigation.IsDependentToPrincipal()
-                        ? navigation.ForeignKey.Properties
-                        : navigation.ForeignKey.PrincipalKey.Properties,
-                    addNullCheck: navigationTree.Parent != null && navigationTree.Parent.Optional);
+        //        var outerKeySelectorBody = CreateKeyAccessExpression(
+        //            transparentIdentifierAccessorExpression,
+        //            navigation.IsDependentToPrincipal()
+        //                ? navigation.ForeignKey.Properties
+        //                : navigation.ForeignKey.PrincipalKey.Properties,
+        //            addNullCheck: navigationTree.Parent != null && navigationTree.Parent.Optional);
 
-                var innerKeySelectorParameterType = navigationTargetEntityType.ClrType;
-                var innerKeySelectorParameter = Expression.Parameter(
-                    innerKeySelectorParameterType,
-                    parameterExpression.Name + "." + navigationTree.Navigation.Name);
+        //        var innerKeySelectorParameterType = navigationTargetEntityType.ClrType;
+        //        var innerKeySelectorParameter = Expression.Parameter(
+        //            innerKeySelectorParameterType,
+        //            parameterExpression.Name + "." + navigationTree.Navigation.Name);
 
-                var innerKeySelectorBody = CreateKeyAccessExpression(
-                    innerKeySelectorParameter,
-                    navigation.IsDependentToPrincipal()
-                        ? navigation.ForeignKey.PrincipalKey.Properties
-                        : navigation.ForeignKey.Properties);
+        //        var innerKeySelectorBody = CreateKeyAccessExpression(
+        //            innerKeySelectorParameter,
+        //            navigation.IsDependentToPrincipal()
+        //                ? navigation.ForeignKey.PrincipalKey.Properties
+        //                : navigation.ForeignKey.Properties);
 
-                if (outerKeySelectorBody.Type.IsNullableType()
-                    && !innerKeySelectorBody.Type.IsNullableType())
-                {
-                    innerKeySelectorBody = Expression.Convert(innerKeySelectorBody, outerKeySelectorBody.Type);
-                }
-                else if (innerKeySelectorBody.Type.IsNullableType()
-                    && !outerKeySelectorBody.Type.IsNullableType())
-                {
-                    outerKeySelectorBody = Expression.Convert(outerKeySelectorBody, innerKeySelectorBody.Type);
-                }
+        //        if (outerKeySelectorBody.Type.IsNullableType()
+        //            && !innerKeySelectorBody.Type.IsNullableType())
+        //        {
+        //            innerKeySelectorBody = Expression.Convert(innerKeySelectorBody, outerKeySelectorBody.Type);
+        //        }
+        //        else if (innerKeySelectorBody.Type.IsNullableType()
+        //            && !outerKeySelectorBody.Type.IsNullableType())
+        //        {
+        //            outerKeySelectorBody = Expression.Convert(outerKeySelectorBody, innerKeySelectorBody.Type);
+        //        }
 
-                var outerKeySelector = Expression.Lambda(
-                    outerKeySelectorBody,
-                    outerKeySelectorParameter);
+        //        var outerKeySelector = Expression.Lambda(
+        //            outerKeySelectorBody,
+        //            outerKeySelectorParameter);
 
-                var innerKeySelector = Expression.Lambda(
-                    innerKeySelectorBody,
-                    innerKeySelectorParameter);
+        //        var innerKeySelector = Expression.Lambda(
+        //            innerKeySelectorBody,
+        //            innerKeySelectorParameter);
 
-                var oldParameterExpression = parameterExpression;
-                if (navigationTree.Optional)
-                {
-                    var groupingType = typeof(IEnumerable<>).MakeGenericType(navigationTargetEntityType.ClrType);
-                    var groupJoinResultType = typeof(TransparentIdentifier<,>).MakeGenericType(sourceType, groupingType);
+        //        var oldParameterExpression = parameterExpression;
+        //        if (navigationTree.Optional)
+        //        {
+        //            var groupingType = typeof(IEnumerable<>).MakeGenericType(navigationTargetEntityType.ClrType);
+        //            var groupJoinResultType = typeof(TransparentIdentifier<,>).MakeGenericType(sourceType, groupingType);
 
-                    var groupJoinMethodInfo = QueryableGroupJoinMethodInfo.MakeGenericMethod(
-                        sourceType,
-                        navigationTargetEntityType.ClrType,
-                        outerKeySelector.Body.Type,
-                        groupJoinResultType);
+        //            var groupJoinMethodInfo = QueryableGroupJoinMethodInfo.MakeGenericMethod(
+        //                sourceType,
+        //                navigationTargetEntityType.ClrType,
+        //                outerKeySelector.Body.Type,
+        //                groupJoinResultType);
 
-                    var resultSelectorOuterParameterName = outerParameter.Name;
-                    var resultSelectorOuterParameter = Expression.Parameter(sourceType, resultSelectorOuterParameterName);
+        //            var resultSelectorOuterParameterName = outerParameter.Name;
+        //            var resultSelectorOuterParameter = Expression.Parameter(sourceType, resultSelectorOuterParameterName);
 
-                    var resultSelectorInnerParameterName = innerKeySelectorParameter.Name;
-                    var resultSelectorInnerParameter = Expression.Parameter(groupingType, resultSelectorInnerParameterName);
+        //            var resultSelectorInnerParameterName = innerKeySelectorParameter.Name;
+        //            var resultSelectorInnerParameter = Expression.Parameter(groupingType, resultSelectorInnerParameterName);
 
-                    var groupJoinResultTransparentIdentifierCtorInfo
-                        = groupJoinResultType.GetTypeInfo().GetConstructors().Single();
+        //            var groupJoinResultTransparentIdentifierCtorInfo
+        //                = groupJoinResultType.GetTypeInfo().GetConstructors().Single();
 
-                    var groupJoinResultSelector = Expression.Lambda(
-                        Expression.New(groupJoinResultTransparentIdentifierCtorInfo, resultSelectorOuterParameter, resultSelectorInnerParameter),
-                        resultSelectorOuterParameter,
-                        resultSelectorInnerParameter);
+        //            var groupJoinResultSelector = Expression.Lambda(
+        //                Expression.New(groupJoinResultTransparentIdentifierCtorInfo, resultSelectorOuterParameter, resultSelectorInnerParameter),
+        //                resultSelectorOuterParameter,
+        //                resultSelectorInnerParameter);
 
-                    var groupJoinMethodCall
-                        = Expression.Call(
-                            groupJoinMethodInfo,
-                            sourceExpression,
-                            entityQueryable,
-                            outerKeySelector,
-                            innerKeySelector,
-                            groupJoinResultSelector);
+        //            var groupJoinMethodCall
+        //                = Expression.Call(
+        //                    groupJoinMethodInfo,
+        //                    sourceExpression,
+        //                    entityQueryable,
+        //                    outerKeySelector,
+        //                    innerKeySelector,
+        //                    groupJoinResultSelector);
 
-                    var selectManyResultType = typeof(TransparentIdentifier<,>).MakeGenericType(groupJoinResultType, navigationTargetEntityType.ClrType);
+        //            var selectManyResultType = typeof(TransparentIdentifier<,>).MakeGenericType(groupJoinResultType, navigationTargetEntityType.ClrType);
 
-                    var selectManyMethodInfo = QueryableSelectManyWithResultOperatorMethodInfo.MakeGenericMethod(
-                        groupJoinResultType,
-                        navigationTargetEntityType.ClrType,
-                        selectManyResultType);
+        //            var selectManyMethodInfo = QueryableSelectManyWithResultOperatorMethodInfo.MakeGenericMethod(
+        //                groupJoinResultType,
+        //                navigationTargetEntityType.ClrType,
+        //                selectManyResultType);
 
-                    var defaultIfEmptyMethodInfo = EnumerableDefaultIfEmptyMethodInfo.MakeGenericMethod(navigationTargetEntityType.ClrType);
+        //            var defaultIfEmptyMethodInfo = EnumerableDefaultIfEmptyMethodInfo.MakeGenericMethod(navigationTargetEntityType.ClrType);
 
-                    var selectManyCollectionSelectorParameter = Expression.Parameter(groupJoinResultType);
-                    var selectManyCollectionSelector = Expression.Lambda(
-                        Expression.Call(
-                            defaultIfEmptyMethodInfo,
-                            Expression.Field(selectManyCollectionSelectorParameter, nameof(TransparentIdentifier<object, object>.Inner))),
-                        selectManyCollectionSelectorParameter);
+        //            var selectManyCollectionSelectorParameter = Expression.Parameter(groupJoinResultType);
+        //            var selectManyCollectionSelector = Expression.Lambda(
+        //                Expression.Call(
+        //                    defaultIfEmptyMethodInfo,
+        //                    Expression.Field(selectManyCollectionSelectorParameter, nameof(TransparentIdentifier<object, object>.Inner))),
+        //                selectManyCollectionSelectorParameter);
 
-                    var selectManyResultTransparentIdentifierCtorInfo
-                        = selectManyResultType.GetTypeInfo().GetConstructors().Single();
+        //            var selectManyResultTransparentIdentifierCtorInfo
+        //                = selectManyResultType.GetTypeInfo().GetConstructors().Single();
 
-                    // TODO: dont reuse parameters here?
-                    var selectManyResultSelector = Expression.Lambda(
-                        Expression.New(selectManyResultTransparentIdentifierCtorInfo, selectManyCollectionSelectorParameter, innerKeySelectorParameter),
-                        selectManyCollectionSelectorParameter,
-                        innerKeySelectorParameter);
+        //            // TODO: dont reuse parameters here?
+        //            var selectManyResultSelector = Expression.Lambda(
+        //                Expression.New(selectManyResultTransparentIdentifierCtorInfo, selectManyCollectionSelectorParameter, innerKeySelectorParameter),
+        //                selectManyCollectionSelectorParameter,
+        //                innerKeySelectorParameter);
 
-                    var selectManyMethodCall
-                        = Expression.Call(selectManyMethodInfo,
-                        groupJoinMethodCall,
-                        selectManyCollectionSelector,
-                        selectManyResultSelector);
+        //            var selectManyMethodCall
+        //                = Expression.Call(selectManyMethodInfo,
+        //                groupJoinMethodCall,
+        //                selectManyCollectionSelector,
+        //                selectManyResultSelector);
 
-                    sourceType = selectManyResultSelector.ReturnType;
-                    sourceExpression = selectManyMethodCall;
+        //            sourceType = selectManyResultSelector.ReturnType;
+        //            sourceExpression = selectManyMethodCall;
 
-                    var transparentIdentifierParameterName = resultSelectorInnerParameterName;
-                    var transparentIdentifierParameter = Expression.Parameter(selectManyResultSelector.ReturnType, transparentIdentifierParameterName);
-                    parameterExpression = transparentIdentifierParameter;
-                }
-                else
-                {
-                    var joinMethodInfo = QueryableJoinMethodInfo.MakeGenericMethod(
-                        sourceType,
-                        navigationTargetEntityType.ClrType,
-                        outerKeySelector.Body.Type,
-                        resultType);
+        //            var transparentIdentifierParameterName = resultSelectorInnerParameterName;
+        //            var transparentIdentifierParameter = Expression.Parameter(selectManyResultSelector.ReturnType, transparentIdentifierParameterName);
+        //            parameterExpression = transparentIdentifierParameter;
+        //        }
+        //        else
+        //        {
+        //            var joinMethodInfo = QueryableJoinMethodInfo.MakeGenericMethod(
+        //                sourceType,
+        //                navigationTargetEntityType.ClrType,
+        //                outerKeySelector.Body.Type,
+        //                resultType);
 
-                    var resultSelectorOuterParameterName = outerParameter.Name;
-                    var resultSelectorOuterParameter = Expression.Parameter(sourceType, resultSelectorOuterParameterName);
+        //            var resultSelectorOuterParameterName = outerParameter.Name;
+        //            var resultSelectorOuterParameter = Expression.Parameter(sourceType, resultSelectorOuterParameterName);
 
-                    var resultSelectorInnerParameterName = innerKeySelectorParameter.Name;
-                    var resultSelectorInnerParameter = Expression.Parameter(navigationTargetEntityType.ClrType, resultSelectorInnerParameterName);
+        //            var resultSelectorInnerParameterName = innerKeySelectorParameter.Name;
+        //            var resultSelectorInnerParameter = Expression.Parameter(navigationTargetEntityType.ClrType, resultSelectorInnerParameterName);
 
-                    var transparentIdentifierCtorInfo
-                        = resultType.GetTypeInfo().GetConstructors().Single();
+        //            var transparentIdentifierCtorInfo
+        //                = resultType.GetTypeInfo().GetConstructors().Single();
 
-                    var resultSelector = Expression.Lambda(
-                        Expression.New(transparentIdentifierCtorInfo, resultSelectorOuterParameter, resultSelectorInnerParameter),
-                        resultSelectorOuterParameter,
-                        resultSelectorInnerParameter);
+        //            var resultSelector = Expression.Lambda(
+        //                Expression.New(transparentIdentifierCtorInfo, resultSelectorOuterParameter, resultSelectorInnerParameter),
+        //                resultSelectorOuterParameter,
+        //                resultSelectorInnerParameter);
 
-                    var joinMethodCall = Expression.Call(
-                        joinMethodInfo,
-                        sourceExpression,
-                        entityQueryable,
-                        outerKeySelector,
-                        innerKeySelector,
-                        resultSelector);
+        //            var joinMethodCall = Expression.Call(
+        //                joinMethodInfo,
+        //                sourceExpression,
+        //                entityQueryable,
+        //                outerKeySelector,
+        //                innerKeySelector,
+        //                resultSelector);
 
-                    sourceType = resultSelector.ReturnType;
-                    sourceExpression = joinMethodCall;
+        //            sourceType = resultSelector.ReturnType;
+        //            sourceExpression = joinMethodCall;
 
-                    var transparentIdentifierParameterName = /*resultSelectorOuterParameterName + */resultSelectorInnerParameterName;
-                    var transparentIdentifierParameter = Expression.Parameter(resultSelector.ReturnType, transparentIdentifierParameterName);
-                    parameterExpression = transparentIdentifierParameter;
-                }
+        //            var transparentIdentifierParameterName = /*resultSelectorOuterParameterName + */resultSelectorInnerParameterName;
+        //            var transparentIdentifierParameter = Expression.Parameter(resultSelector.ReturnType, transparentIdentifierParameterName);
+        //            parameterExpression = transparentIdentifierParameter;
+        //        }
 
-                if (navigationPath.Count == 0
-                    && !navigationExpansionMapping.Any(m => m.navigations.Count == 0))
-                {
-                    navigationExpansionMapping.Add((path: new List<string>(), initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList()));
-                }
+        //        if (navigationPath.Count == 0
+        //            && !navigationExpansionMapping.Any(m => m.navigations.Count == 0))
+        //        {
+        //            navigationExpansionMapping.Add((path: new List<string>(), initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList()));
+        //        }
 
-                foreach (var navigationExpansionMappingElement in navigationExpansionMapping)
-                {
-                    navigationExpansionMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+        //        foreach (var navigationExpansionMappingElement in navigationExpansionMapping)
+        //        {
+        //            navigationExpansionMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
 
-                    // in case of GroupJoin (optional navigation) source is hidden deeps since we also project the grouping
-                    // we could remove the grouping in the future, but for nowe we need the grouping to properly recognize the LOJ pattern
-                    if (navigationTree.Optional)
-                    {
-                        navigationExpansionMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                    }
-                }
+        //            // in case of GroupJoin (optional navigation) source is hidden deeps since we also project the grouping
+        //            // we could remove the grouping in the future, but for nowe we need the grouping to properly recognize the LOJ pattern
+        //            if (navigationTree.Optional)
+        //            {
+        //                navigationExpansionMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+        //            }
+        //        }
 
-                navigationPath.Add(navigation);
-                navigationExpansionMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList() ));
+        //        navigationPath.Add(navigation);
+        //        navigationExpansionMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, initialPath: new List<string>(), rootEntityType, navigations: navigationPath.ToList() ));
 
-                finalProjectionPath.Add("Outer");
-                if (navigationTree.Optional)
-                {
-                    finalProjectionPath.Add("Outer");
-                }
+        //        finalProjectionPath.Add("Outer");
+        //        if (navigationTree.Optional)
+        //        {
+        //            finalProjectionPath.Add("Outer");
+        //        }
 
-                if (pendingSelector != null)
-                {
-                    var psuev = new PendingSelectorUpdatingExpressionVisitor(oldParameterExpression, parameterExpression, navigationTree.Optional);
-                    pendingSelector = (LambdaExpression)psuev.Visit(pendingSelector);
-                }
-            }
-            else
-            {
-                navigationPath.Add(navigationTree.Navigation);
-            }
+        //        if (pendingSelector != null)
+        //        {
+        //            var psuev = new PendingSelectorUpdatingExpressionVisitor(oldParameterExpression, parameterExpression, navigationTree.Optional);
+        //            pendingSelector = (LambdaExpression)psuev.Visit(pendingSelector);
+        //        }
+        //    }
+        //    else
+        //    {
+        //        navigationPath.Add(navigationTree.Navigation);
+        //    }
 
-            var result = (source: sourceExpression, parameter: parameterExpression, pendingSelector);
-            foreach (var child in navigationTree.Children)
-            {
-                result = AddNavigationJoin(
-                    result.source,
-                    result.parameter,
-                    child,
-                    rootEntityType,
-                    navigationPath.ToList(),
-                    finalProjectionPath,
-                    navigationExpansionMapping,
-                    result.pendingSelector);
-            }
+        //    var result = (source: sourceExpression, parameter: parameterExpression, pendingSelector);
+        //    foreach (var child in navigationTree.Children)
+        //    {
+        //        result = AddNavigationJoin(
+        //            result.source,
+        //            result.parameter,
+        //            child,
+        //            rootEntityType,
+        //            navigationPath.ToList(),
+        //            finalProjectionPath,
+        //            navigationExpansionMapping,
+        //            result.pendingSelector);
+        //    }
 
-            return result;
-        }
+        //    return result;
+        //}
 
         private (Expression source, ParameterExpression parameter, LambdaExpression pendingSelector) AddNavigationJoin2(
             Expression sourceExpression,
             ParameterExpression parameterExpression,
             SourceMapping sourceMapping,
+            List<SourceMapping> allSourceMappings,
             NavigationTreeNode navigationTree,
             List<INavigation> navigationPath,
             LambdaExpression pendingSelector)
@@ -1800,7 +1821,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
                 var outerParameter = Expression.Parameter(sourceType, parameterExpression.Name);
                 var outerKeySelectorParameter = outerParameter;
-                var transparentIdentifierAccessorExpression = BuildTransparentIdentifierAccessorExpression(outerParameter, transparentIdentifierAccessorPath);
+                var transparentIdentifierAccessorExpression = BuildTransparentIdentifierAccessorExpression(outerParameter, sourceMapping.InitialPath, transparentIdentifierAccessorPath);
 
                 var outerKeySelectorBody = CreateKeyAccessExpression(
                     transparentIdentifierAccessorExpression,
@@ -1950,26 +1971,49 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     parameterExpression = transparentIdentifierParameter;
                 }
 
+
+                // TODO: do we need to add the empty entry to ALL source mappings or just the one that is being processed?!
                 if (navigationPath.Count == 0
                     && !sourceMapping.TransparentIdentifierMapping.Any(m => m.navigations.Count == 0))
                 {
                     sourceMapping.TransparentIdentifierMapping.Add((path: new List<string>(), navigations: navigationPath.ToList()));
                 }
 
-                foreach (var transparentIdentifierMappingElement in sourceMapping.TransparentIdentifierMapping)
+                foreach (var aSourceMapping in allSourceMappings)
                 {
-                    transparentIdentifierMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-
-                    // in case of GroupJoin (optional navigation) source is hidden deeps since we also project the grouping
-                    // we could remove the grouping in the future, but for nowe we need the grouping to properly recognize the LOJ pattern
-                    if (navigationTree.Optional)
+                    foreach (var transparentIdentifierMappingElement in aSourceMapping.TransparentIdentifierMapping)
                     {
                         transparentIdentifierMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+
+                        // in case of GroupJoin (optional navigation) source is hidden deeps since we also project the grouping
+                        // we could remove the grouping in the future, but for nowe we need the grouping to properly recognize the LOJ pattern
+                        if (navigationTree.Optional)
+                        {
+                            transparentIdentifierMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                        }
                     }
                 }
 
+                //foreach (var transparentIdentifierMappingElement in sourceMapping.TransparentIdentifierMapping)
+                //{
+                //    transparentIdentifierMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+
+                //    // in case of GroupJoin (optional navigation) source is hidden deeps since we also project the grouping
+                //    // we could remove the grouping in the future, but for nowe we need the grouping to properly recognize the LOJ pattern
+                //    if (navigationTree.Optional)
+                //    {
+                //        transparentIdentifierMappingElement.path.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                //    }
+                //}
+
                 navigationPath.Add(navigation);
-                sourceMapping.TransparentIdentifierMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, navigations: navigationPath.ToList()));
+
+                foreach (var aSourceMapping in allSourceMappings)
+                {
+                    aSourceMapping.TransparentIdentifierMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, navigations: navigationPath.ToList()));
+                }
+
+                //sourceMapping.TransparentIdentifierMapping.Add((path: new List<string> { nameof(TransparentIdentifier<object, object>.Inner) }, navigations: navigationPath.ToList()));
 
                 if (pendingSelector != null)
                 {
@@ -1989,6 +2033,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     result.source,
                     result.parameter,
                     sourceMapping,
+                    allSourceMappings,
                     child,
                     navigationPath.ToList(),
                     result.pendingSelector);
@@ -2090,12 +2135,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         }
 
         // TODO: DRY
-        private Expression BuildTransparentIdentifierAccessorExpression(Expression source, List<string> accessorPath)
+        private Expression BuildTransparentIdentifierAccessorExpression(Expression source, List<string> initialPath, List<string> accessorPath)
         {
             var result = source;
-            if (accessorPath != null)
+
+            var fullPath = initialPath != null
+                ? initialPath.Concat(accessorPath).ToList()
+                : accessorPath;
+
+            if (fullPath != null)
             {
-                foreach (var accessorPathElement in accessorPath)
+                foreach (var accessorPathElement in fullPath)
                 {
                     // TODO: nasty hack, clean this up!!!!
                     if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
