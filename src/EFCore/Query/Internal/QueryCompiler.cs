@@ -149,7 +149,20 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                             // HACK: sometimes QM will access Inner/Outer property of the QSRE that is itself a transparent identifier - we should just allow that
                             if (!(result is NewExpression))
                             {
-                                return memberExpression;
+                                if (extractionPath.Count == 0)
+                                {
+                                    return memberExpression;
+                                }
+
+                                var expr = Expression.Field(result, extractionPathElement);
+                                while (extractionPath.Count > 0)
+                                {
+                                    expr = Expression.Field(expr, extractionPath.Pop());
+                                }
+
+                                return expr;
+
+                                //return memberExpression;
                             }
 
                             var newExpression = (NewExpression)result;
@@ -188,6 +201,11 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
             {
+                if (methodCallExpression.ToString().EndsWith(@"uired_FK1]).Outer.Outer.Inner.Outer.Outer.Outer.Outer, ""Id"")"))
+                {
+
+                }
+
                 if (methodCallExpression.Method.Name == "Property")
                 {
 

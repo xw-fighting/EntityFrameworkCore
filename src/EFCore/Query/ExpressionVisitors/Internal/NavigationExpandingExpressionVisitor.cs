@@ -844,23 +844,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             //    newTransparentIdentifierAccessorMapping.Add((innerMappingEntry.from, to: new[] { "Inner" }.Concat(innerMappingEntry.to).ToList()));
             //}
 
-            var finalState = new NavigationExpansionExpressionState
-            {
-                PendingSelector = null,
-                CurrentParameter = transparentIdentifierParameter,
-                FinalProjectionPath = new List<string>(),
-                SourceMappings = outerResult.state.SourceMappings.Concat(innerResult.state.SourceMappings).ToList()
-
-                //FoundNavigations = outerResult.state.FoundNavigations.Concat(innerResult.state.FoundNavigations).ToList(), // ???
-                //NavigationExpansionMapping = newNavigationExpansionMapping
-                //TransparentIdentifierAccessorMapping = newTransparentIdentifierAccessorMapping
-            };
-
-            var fubar = new NavigationExpansionExpression(
-                rewritten,
-                finalState,
-                rewritten.Type);
-
             var outerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Outer));
             var innerAccess = Expression.Field(transparentIdentifierParameter, nameof(TransparentIdentifier<object, object>.Inner));
 
@@ -873,9 +856,51 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var lambda = Expression.Lambda(foo4, transparentIdentifierParameter);
 
             var select = QueryableSelectMethodInfo.MakeGenericMethod(transparentIdentifierParameter.Type, lambda.Body.Type);
-            var fubaz = Expression.Call(select, fubar, lambda);
 
-            return Visit(fubaz);
+            var finalState = new NavigationExpansionExpressionState
+            {
+                PendingSelector = lambda,
+                CurrentParameter = transparentIdentifierParameter,
+                FinalProjectionPath = new List<string>(),
+                SourceMappings = outerResult.state.SourceMappings.Concat(innerResult.state.SourceMappings).ToList()
+
+                //FoundNavigations = outerResult.state.FoundNavigations.Concat(innerResult.state.FoundNavigations).ToList(), // ???
+                //NavigationExpansionMapping = newNavigationExpansionMapping
+                //TransparentIdentifierAccessorMapping = newTransparentIdentifierAccessorMapping
+            };
+
+            var fubar = new NavigationExpansionExpression(
+                rewritten,
+                finalState,
+                select.ReturnType);
+            //rewritten.Type);
+
+            var fubar22 = FindAndApplyNavigations(rewritten, lambda, finalState);
+
+
+
+            fubar22.state.PendingSelector = (LambdaExpression)fubar22.lambda;
+
+            return new NavigationExpansionExpression(
+                fubar22.source,
+                fubar22.state,
+                select.ReturnType);
+
+
+            //var finalResult = new NavigationExpansionExpression(fubar22.source, fubar22.state, select.ReturnType);
+
+
+            //return finalResult;
+
+            //return fubar;
+
+
+
+
+
+            //var fubaz = Expression.Call(select, fubar, lambda);
+
+            //return Visit(fubaz);
 
 
             //// append Select method representing the result selector of the Join operation
@@ -1538,7 +1563,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                             state.SourceMappings,
                             navigationTree,
                             new List<INavigation>(),
-                            state.PendingSelector);
+                            result.pendingSelector);
+                            //state.PendingSelector);
                     }
                 }
             }
