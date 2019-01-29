@@ -2367,7 +2367,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
                     if (transparentIdentifierAccessorPath != null)
                     {
-                        var result = BuildTransparentIdentifierAccessorExpression(_newParameter, transparentIdentifierAccessorPath);
+                        var result = BuildTransparentIdentifierAccessorExpression(_newParameter, navigationBindingExpression.SourceMapping.InitialPath, transparentIdentifierAccessorPath);
 
                         return result;
                     }
@@ -2405,14 +2405,27 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         }
 
         // TODO: DRY
-        private Expression BuildTransparentIdentifierAccessorExpression(Expression source, List<string> accessorPath)
+        private Expression BuildTransparentIdentifierAccessorExpression(Expression source, List<string> initialPath, List<string> accessorPath)
         {
             var result = source;
-            if (accessorPath != null)
+
+            var fullPath = initialPath != null
+                ? initialPath.Concat(accessorPath).ToList()
+                : accessorPath;
+
+            if (fullPath != null)
             {
-                foreach (var accessorPathElement in accessorPath)
+                foreach (var accessorPathElement in fullPath)
                 {
-                    result = Expression.Field(result, accessorPathElement);
+                    // TODO: nasty hack, clean this up!!!!
+                    if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
+                    {
+                        result = Expression.Property(result, accessorPathElement);
+                    }
+                    else
+                    {
+                        result = Expression.Field(result, accessorPathElement);
+                    }
                 }
             }
 

@@ -1732,8 +1732,8 @@ INNER JOIN [Orders] AS [o] ON [c].[CustomerID] = [o].[CustomerID]");
     WHEN EXISTS (
         SELECT 1
         FROM [Customers] AS [c]
-        INNER JOIN [Orders] AS [or] ON [c].[CustomerID] = [or].[CustomerID]
-        INNER JOIN [Order Details] AS [od] ON [or].[OrderID] = [od].[OrderID]
+        INNER JOIN [Orders] AS [o] ON [c].[CustomerID] = [o].[CustomerID]
+        INNER JOIN [Order Details] AS [od] ON [o].[OrderID] = [od].[OrderID]
         WHERE [c].[City] = N'London')
     THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT)
 END");
