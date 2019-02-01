@@ -4122,6 +4122,110 @@ WHERE (([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK
                 @"");
         }
 
+        public override void Nav8()
+        {
+            base.Nav8();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav9()
+        {
+            base.Nav9();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav10()
+        {
+            base.Nav10();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav11()
+        {
+            base.Nav11();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav12()
+        {
+            base.Nav12();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany1()
+        {
+            base.SelectMany1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany2()
+        {
+            base.SelectMany2();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany3()
+        {
+            base.SelectMany3();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany4()
+        {
+            base.SelectMany4();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany5()
+        {
+            base.SelectMany5();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void SelectMany6()
+        {
+            base.SelectMany6();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void ComplexWhere()
+        {
+            base.ComplexWhere();
+
+            AssertSql(
+                @"SELECT [l1].[Id], [l1].[Date], [l1].[Name], [l1].[OneToMany_Optional_Self_Inverse1Id], [l1].[OneToMany_Required_Self_Inverse1Id], [l1].[OneToOne_Optional_Self1Id]
+FROM [LevelOne] AS [l1]
+LEFT JOIN [LevelTwo] AS [l1.OneToOne_Required_FK1] ON [l1].[Id] = [l1.OneToOne_Required_FK1].[Level1_Required_Id]
+WHERE (
+    SELECT COUNT(*)
+    FROM [LevelThree] AS [l]
+    LEFT JOIN [LevelFour] AS [l.OneToOne_Optional_PK3] ON [l].[Id] = [l.OneToOne_Optional_PK3].[OneToOne_Optional_PK_Inverse4Id]
+    WHERE ([l1.OneToOne_Required_FK1].[Id] = [l].[OneToMany_Optional_Inverse3Id]) AND (([l.OneToOne_Optional_PK3].[Name] <> N'Foo') OR [l.OneToOne_Optional_PK3].[Name] IS NULL)
+) > 0");
+        }
+
         private void AssertSql(params string[] expected)
         {
             Fixture.TestSqlLoggerFactory.AssertBaseline(expected);

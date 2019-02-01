@@ -86,11 +86,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
                     // TODO: this could be other things too: EF.Property and maybe field
-                    // TODO: rewrite into nav binding expression
-                    var outerExpression = ((MemberExpression)navigationBindingExpression.Operand).Expression;
+                    var newNavigations = navigationBindingExpression.Navigations.Take(navigationBindingExpression.Navigations.Count - 1).ToList();
+                    var outerBinding = new NavigationBindingExpression2(
+                        ((MemberExpression)navigationBindingExpression.Operand).Expression,
+                        navigationBindingExpression.RootParameter,
+                        newNavigations,
+                        newNavigations.LastOrDefault()?.GetTargetType() ?? lastNavigation.DeclaringEntityType,
+                        navigationBindingExpression.SourceMapping);
 
                     var outerKeyAccess = CreateKeyAccessExpression(
-                        outerExpression,
+                        outerBinding,
                         lastNavigation.ForeignKey.PrincipalKey.Properties);
 
                     var innerParameter = Expression.Parameter(collectionNavigationElementType, collectionNavigationElementType.GenerateParameterName());
@@ -102,7 +107,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                             outerKeyAccess,
                             innerKeyAccess,
-                            outerExpression,
+                            outerBinding,
                             navigationBindingExpression.RootParameter,
                             navigationBindingExpression.Navigations),
                         innerParameter);
@@ -113,10 +118,30 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         predicate);
                 }
 
-                return navigationBindingExpression;
+                //return navigationBindingExpression;
             }
 
-            return base.VisitExtension(extensionExpression);
+            if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
+            {
+                var newOuterKeyNullCheck = Visit(nullSafeEqualExpression.OuterKeyNullCheck);
+                var newEqualExpression = (BinaryExpression)Visit(nullSafeEqualExpression.EqualExpression);
+
+                if (newOuterKeyNullCheck != nullSafeEqualExpression.OuterKeyNullCheck
+                    || newEqualExpression != nullSafeEqualExpression.EqualExpression)
+                {
+                    return new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression);
+                }
+            }
+
+            return extensionExpression;
+
+            //// TODO: just return for all other expression also? - we probably don't want to reduce at this point
+            //if (extensionExpression is NavigationExpansionExpression)
+            //{
+            //    return extensionExpression;
+            //}
+
+            //return base.VisitExtension(extensionExpression);
         }
 
         protected override Expression VisitMember(MemberExpression memberExpression)

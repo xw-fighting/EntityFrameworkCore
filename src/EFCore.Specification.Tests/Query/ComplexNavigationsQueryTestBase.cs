@@ -5666,12 +5666,139 @@ namespace Microsoft.EntityFrameworkCore.Query
                         o => o.OneToOne_Optional_PK1.Id,
                         i => i.OneToOne_Optional_PK2.Id,
                         (oo, ii) => new { Id1 = oo.OneToOne_Required_FK1.Id, Id2 = ii.OneToOne_Required_PK2.Id, foo = oo, bar = oo })
-                        .Where(x => x.bar.OneToOne_Optional_FK1.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Name != "Baz")
-
-                        ;
+                        .Where(x => x.bar.OneToOne_Optional_FK1.OneToOne_Optional_FK2.OneToOne_Optional_FK3.Name != "Baz");
 
                 var result = query.ToList();
             }
         }
+
+        [ConditionalFact]
+        public virtual void Nav8()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(l1 => ctx.LevelTwo, (o, i) => new { o.OneToOne_Optional_PK1, i.OneToOne_Required_FK2 });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav9()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(l1 => ctx.LevelTwo.Where(x => x.OneToOne_Required_PK2.OneToOne_Optional_FK3.Name != "Bar"), (o, i) => new { o.OneToOne_Optional_PK1, i.OneToOne_Required_FK2 });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav10()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(l1 => l1.OneToMany_Optional1, (o, i) => new { o.OneToOne_Optional_PK1, i.OneToOne_Required_FK2 });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav11()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(l1 => l1.OneToOne_Required_FK1.OneToMany_Optional2, (o, i) => new { o.OneToOne_Optional_PK1, i.OneToOne_Required_FK3 });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav12()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(l1 => l1.OneToOne_Required_FK1.OneToMany_Optional2.Where(l3 => l3.OneToOne_Optional_FK3.Name != "Baz"), (o, i) => new { o.OneToOne_Optional_PK1, i.OneToOne_Required_FK3 });
+                var result = query.ToList();
+            }
+        }
+
+
+        [ConditionalFact]
+        public virtual void SelectMany1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => ctx.LevelTwo, (o, i) => new { o, i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany2()
+        {
+
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_PK2.Name != "Bar"), (o, i) => o);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => x.OneToMany_Optional1, (o, i) => i);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => x.OneToMany_Optional1.Where(l2 => l2.OneToOne_Required_PK2.Name != "Bar"), (o, i) => new { o });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany5()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => x.OneToOne_Optional_PK1.OneToMany_Optional2, (o, i) => new { i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany6()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => x.OneToOne_Optional_PK1.OneToMany_Optional2.Where(l3 => l3.OneToOne_Required_PK3.Name != "Bar"), (o, i) => new { o, i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void ComplexWhere()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(l1 => l1.OneToOne_Required_FK1.OneToMany_Optional2.Where(x => x.OneToOne_Optional_PK3.Name != "Foo").Count() > 0);
+                var result = query.ToList();
+            }
+        }
+
+        // TODO: what about case where collection selector is correlated with the parameter from the outside????
     }
 }
