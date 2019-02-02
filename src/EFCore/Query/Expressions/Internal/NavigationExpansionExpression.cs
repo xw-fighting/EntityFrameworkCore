@@ -27,9 +27,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
     {
         public ParameterExpression CurrentParameter { get; set; }
         public List<SourceMapping> SourceMappings { get; set; } = new List<SourceMapping>();
-        //public List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)> NavigationExpansionMapping = new List<(List<string> path, List<string> initialPath, IEntityType rootEntityType, List<INavigation> navigations)>();
         public LambdaExpression PendingSelector { get; set; }
-        //public List<NavigationTreeNode> FoundNavigations { get; set; } = new List<NavigationTreeNode>();
         public List<string> FinalProjectionPath { get; set; } = new List<string>();
     }
 
@@ -54,38 +52,17 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
                 return Operand;
             }
 
-            // TODO: what is the correct order?
-
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
             if (State.PendingSelector != null)
             {
-                //TODO: hack!
                 var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
                     ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type)
                     : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
 
-                //var pendingSelectMathod = _selectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
                 result = Call(pendingSelectMathod, result, State.PendingSelector);
                 parameter = Parameter(result.Type.GetGenericArguments()[0]);
             }
-            //else if (State.FinalProjectionPath.Count > 0)
-            //{
-            //    // TODO: is this correct? do we only need to apply the path if no pending selector is present?
-            //    // maybe this can be unified somehow?!
-
-            //    //var parameter = Parameter(Operand.Type.GetGenericArguments()[0]);
-            //    var body = (Expression)parameter;
-            //    foreach (var finalProjectionPathElement in State.FinalProjectionPath)
-            //    {
-            //        body = Field(body, finalProjectionPathElement);
-            //    }
-
-            //    var lambda = Lambda(body, parameter);
-            //    var method = _selectMethodInfo.MakeGenericMethod(parameter.Type, body.Type);
-
-            //    result = Call(method, Operand, lambda);
-            //}
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
             { 

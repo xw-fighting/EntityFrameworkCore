@@ -76,7 +76,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         protected override Expression VisitExtension(Expression extensionExpression)
         {
-            if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+            if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
                 if (navigationBindingExpression.Navigations.Count > 0
                     && navigationBindingExpression.Navigations.Last() is INavigation lastNavigation
@@ -87,7 +87,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
                     // TODO: this could be other things too: EF.Property and maybe field
                     var newNavigations = navigationBindingExpression.Navigations.Take(navigationBindingExpression.Navigations.Count - 1).ToList();
-                    var outerBinding = new NavigationBindingExpression2(
+                    var outerBinding = new NavigationBindingExpression(
                         ((MemberExpression)navigationBindingExpression.Operand).Expression,
                         navigationBindingExpression.RootParameter,
                         newNavigations,
