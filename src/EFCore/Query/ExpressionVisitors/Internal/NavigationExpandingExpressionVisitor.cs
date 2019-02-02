@@ -90,6 +90,50 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public readonly TInner Inner;
     }
 
+    public abstract class NavigationExpansionExpressionVisitorBase : ExpressionVisitor
+    {
+        protected override Expression VisitExtension(Expression extensionExpression)
+        {
+            if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+            {
+                var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression.RootParameter);
+                var newOperand = Visit(navigationBindingExpression.Operand);
+
+                return newRootParameter != navigationBindingExpression.RootParameter || newOperand != navigationBindingExpression.Operand
+                    ? new NavigationBindingExpression2(
+                        newOperand,
+                        newRootParameter,
+                        navigationBindingExpression.Navigations.ToList(),
+                        navigationBindingExpression.EntityType,
+                        navigationBindingExpression.SourceMapping)
+                    : navigationBindingExpression;
+            }
+
+            if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
+            {
+                var newOperand = Visit(navigationExpansionExpression.Operand);
+
+                return newOperand != navigationExpansionExpression.Operand
+                    ? new NavigationExpansionExpression(
+                        newOperand,
+                        navigationExpansionExpression.State,
+                        navigationExpansionExpression.Type)
+                    : navigationExpansionExpression;
+            }
+
+            if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
+            {
+                var newOuterKeyNullCheck = Visit(nullSafeEqualExpression.OuterKeyNullCheck);
+                var newEqualExpression = (BinaryExpression)Visit(nullSafeEqualExpression.EqualExpression);
+
+                return newOuterKeyNullCheck != nullSafeEqualExpression.OuterKeyNullCheck || newEqualExpression != nullSafeEqualExpression.EqualExpression
+                    ? new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression)
+                    : nullSafeEqualExpression;
+            }
+
+            return base.VisitExtension(extensionExpression);
+        }
+    }
 
     public class NavigationPropertyBindingExpressionVisitor2 : ExpressionVisitor
     {
@@ -706,11 +750,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 _rootParameter = rootParameter;
             }
 
-            //public override Expression Visit(Expression expression)
-            //    => Correlated
-            //    ? expression
-            //    : base.Visit(expression);
-
             protected override Expression VisitParameter(ParameterExpression parameterExpression)
             {
                 if (parameterExpression == _rootParameter)
@@ -725,14 +764,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             {
                 if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
                 {
+                    Visit(navigationBindingExpression.RootParameter);
                     Visit(navigationBindingExpression.Operand);
                 }
-
-                //if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression
-                //    && navigationBindingExpression.RootParameter == _rootParameter)
-                //{
-                //    CorrelatedBinding = navigationBindingExpression;
-                //}
 
                 if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
                 {
@@ -746,6 +780,85 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
 
                 return extensionExpression;
+            }
+        }
+
+        // TODO: can this be combined with the checker?
+        private class CorrelationPredicateExtractor : NavigationExpansionExpressionVisitorBase
+        {
+            private ParameterExpression _rootParameter;
+
+            public NullSafeEqualExpression CorrelationPredicate { get; private set; }
+            public ParameterExpression CorrelatedCollectionParameter { get; private set; }
+
+            public CorrelationPredicateExtractor(ParameterExpression rootParameter)
+            {
+                _rootParameter = rootParameter;
+            }
+
+            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+            {
+                if (methodCallExpression.Method.Name == "Where"
+                    && methodCallExpression.Arguments[1].UnwrapQuote() is LambdaExpression lambda
+                    && lambda.Body is NullSafeEqualExpression nullSafeEqualExpression)
+                {
+                    var parameterFinder = new ParameterFinder(_rootParameter);
+                    parameterFinder.Visit(nullSafeEqualExpression.EqualExpression.Left);
+                    if (parameterFinder.Found)
+                    {
+                        CorrelationPredicate = nullSafeEqualExpression;
+                        CorrelatedCollectionParameter = methodCallExpression.Arguments[1].UnwrapQuote().Parameters[0];
+
+                        return methodCallExpression.Update(
+                            null,
+                            new[]
+                            {
+                                methodCallExpression.Arguments[0],
+                                Expression.Lambda(Expression.Constant(true), lambda.Parameters[0])
+                            });
+                    }
+                }
+
+                return base.VisitMethodCall(methodCallExpression);
+            }
+
+            //protected override Expression VisitExtension(Expression extensionExpression)
+            //{
+            //    if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
+            //    {
+            //        var parameterFinder = new ParameterFinder(_rootParameter);
+            //        parameterFinder.Visit(nullSafeEqualExpression.EqualExpression.Left);
+            //        if (parameterFinder.Found)
+            //        {
+            //            CorrelationPredicate = nullSafeEqualExpression;
+
+            //            return Expression.Constant(true);
+            //        }
+            //    }
+
+            //    return base.VisitExtension(extensionExpression);
+            //}
+
+            private class ParameterFinder : NavigationExpansionExpressionVisitorBase
+            {
+                private ParameterExpression _rootParameter;
+
+                public bool Found { get; private set; } = false;
+
+                public ParameterFinder(ParameterExpression rootParameter)
+                {
+                    _rootParameter = rootParameter;
+                }
+
+                protected override Expression VisitParameter(ParameterExpression parameterExpression)
+                {
+                    if (parameterExpression == _rootParameter)
+                    {
+                        Found = true;
+                    }
+
+                    return parameterExpression;
+                }
             }
         }
 
@@ -884,22 +997,67 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
             }
 
+            var correlationPredicateExtractor = new CorrelationPredicateExtractor(combinedCollectionSelector.Parameters[0]);
+            var collectionSelectorWithoutCorelationPredicate = correlationPredicateExtractor.Visit(combinedCollectionSelector);
+            if (correlationPredicateExtractor.CorrelationPredicate != null)
+            {
+                var inner = (NavigationExpansionExpression)collectionSelectorWithoutCorelationPredicate.UnwrapQuote().Body;
+                var resultSelector = methodCallExpression.Arguments[2].UnwrapQuote();
+
+                var joinMethodInfo = QueryableJoinMethodInfo.MakeGenericMethod(
+                    outerState.CurrentParameter.Type,
+                    inner.State.CurrentParameter.Type,
+                    correlationPredicateExtractor.CorrelationPredicate.EqualExpression.Left.Type,
+                    resultSelector.Body.Type);
+                    //typeof(TransparentIdentifier<,>).MakeGenericType(outerState.CurrentParameter.Type, inner.State.CurrentParameter.Type));
+
+                var outerKeyLambda = Expression.Lambda(correlationPredicateExtractor.CorrelationPredicate.EqualExpression.Left, outerState.CurrentParameter);
+
+                // need to remap inner key selector - when correlation predicate was being built it was based on "naked" entity from the collection
+                // however there could have been navigations afterwards which would have caused types to be changed to TransparentIdentifiers
+                // all necessary mappings should be stored in the inner NavigationExpansionExpression state.
+                var innerKeyLambda = Expression.Lambda(correlationPredicateExtractor.CorrelationPredicate.EqualExpression.Right, correlationPredicateExtractor.CorrelatedCollectionParameter);
+                var combinedInnerKeyLambda = ExpressionExtensions.CombineAndRemapLambdas(inner.State.PendingSelector, innerKeyLambda);
+
+
+
+                resultSelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector, resultSelector, resultSelector.Parameters[0]);
+                resultSelector = ExpressionExtensions.CombineAndRemapLambdas(inner.State.PendingSelector, resultSelector, resultSelector.Parameters[1]);
+
+                //var foo2 = ExpressionExtensions.CombineAndRemapLambdas(collectionSelectorNavigationExpansionExpression.State.PendingSelector, foo, resultSelector.Parameters[1]);
+
+
+                //var innerKeyBinder = 
+
+                var rewritten = Expression.Call(
+                    joinMethodInfo,
+                    outerSource,
+                    inner.Operand,
+                    outerKeyLambda,
+                    combinedInnerKeyLambda,
+                    resultSelector);
+
+            }
+
+
             // correlated with source collection -> convert into InnerJoin
             binder = new NavigationPropertyBindingExpressionVisitor2(
                 outerState.CurrentParameter,
                 outerState.SourceMappings);
 
             boundCollectionSelector = binder.Visit(combinedCollectionSelector);
+
             var result = FindAndApplyNavigations(outerSource, combinedCollectionSelector, outerState);
 
 
-            Queryable.Join()
+
+            //Queryable.Join()
 
 
-            QueryableJoinMethodInfo.MakeGenericMethod(
-                result.state.CurrentParameter.Type,
-                boundCollectionSelector.UnwrapQuote().Body.Type,
-                )
+            //QueryableJoinMethodInfo.MakeGenericMethod(
+            //    result.state.CurrentParameter.Type,
+            //    boundCollectionSelector.UnwrapQuote().Body.Type,
+            //    )
 
 
 
