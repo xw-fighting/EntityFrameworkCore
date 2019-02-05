@@ -133,6 +133,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
             }
 
+            if (extensionExpression is NavigationExpansionExpression nee)
+            {
+                var newOperand = Visit(nee.Operand);
+                if (newOperand != nee.Operand)
+                {
+                    return new NavigationExpansionExpression(newOperand, nee.State, nee.Type);
+                }
+            }
+
             return extensionExpression;
 
             //// TODO: just return for all other expression also? - we probably don't want to reduce at this point

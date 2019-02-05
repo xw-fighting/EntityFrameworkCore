@@ -104,6 +104,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             return base.VisitMethodCall(methodCallExpression);
         }
 
+        private NavigationExpansionExpressionState AdjustState(NavigationExpansionExpressionState state, NavigationExpansionExpression navigationExpansionExpression)
+        {
+            var currentParameter = state.CurrentParameter;
+            state = navigationExpansionExpression.State;
+            state.CurrentParameter = state.CurrentParameter ?? currentParameter;
+            //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+            state.PendingSelector = state.PendingSelector ?? Expression.Lambda(state.CurrentParameter, state.CurrentParameter);
+
+            return state;
+        }
+
         private Expression ProcessWhere(MethodCallExpression methodCallExpression)
         {
             var source = Visit(methodCallExpression.Arguments[0]);
@@ -116,12 +127,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (source is NavigationExpansionExpression navigationExpansionExpression)
             {
                 source = navigationExpansionExpression.Operand;
+                state = AdjustState(state, navigationExpansionExpression);
 
-                // TODO: fix this!
-                var currentParameter = state.CurrentParameter;
-                state = navigationExpansionExpression.State;
-                state.CurrentParameter = state.CurrentParameter ?? currentParameter;
-                state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                //// TODO: fix this!
+                //var currentParameter = state.CurrentParameter;
+                //state = navigationExpansionExpression.State;
+                //state.CurrentParameter = state.CurrentParameter ?? currentParameter;
+                //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             var combinedPredicate = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, predicate);
@@ -163,19 +175,29 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (source is NavigationExpansionExpression navigationExpansionExpression)
             {
                 source = navigationExpansionExpression.Operand;
+                state = AdjustState(state, navigationExpansionExpression);
 
-                // TODO: fix this!
-                var currentParameter = state.CurrentParameter;
-                state = navigationExpansionExpression.State;
-                state.CurrentParameter = state.CurrentParameter ?? currentParameter;
-                state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                //// TODO: fix this!
+                //var currentParameter = state.CurrentParameter;
+                //state = navigationExpansionExpression.State;
+                //state.CurrentParameter = state.CurrentParameter ?? currentParameter;
+                //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             var combinedSelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, selector.UnwrapQuote());
             combinedSelector = (LambdaExpression)Visit(combinedSelector);
 
+            var binder = new NavigationPropertyBindingExpressionVisitor(
+                state.CurrentParameter,
+                state.SourceMappings);
+
+            var boundSelector = binder.Visit(combinedSelector);
+
+            var cnrev = new CollectionNavigationRewritingExpressionVisitor2(state.CurrentParameter);
+            combinedSelector = (LambdaExpression)cnrev.Visit(boundSelector);
+
             var result = FindAndApplyNavigations(source, combinedSelector, state);
-            result.state.PendingSelector = (LambdaExpression)result.lambda;
+            result.state.PendingSelector = result.lambda;
 
             return new NavigationExpansionExpression(
                 result.source,
@@ -195,12 +217,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (source is NavigationExpansionExpression navigationExpansionExpression)
             {
                 source = navigationExpansionExpression.Operand;
+                state = AdjustState(state, navigationExpansionExpression);
 
-                // TODO: fix this!
-                var currentParameter = state.CurrentParameter;
-                state = navigationExpansionExpression.State;
-                state.CurrentParameter = state.CurrentParameter ?? currentParameter;
-                state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                //// TODO: fix this!
+                //var currentParameter = state.CurrentParameter;
+                //state = navigationExpansionExpression.State;
+                //state.CurrentParameter = state.CurrentParameter ?? currentParameter;
+                //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             var combinedKeySelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, keySelector.UnwrapQuote());
@@ -250,10 +273,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
             {
                 outerSource = outerNavigationExpansionExpression.Operand;
-                var currentParameter = outerState.CurrentParameter;
-                outerState = outerNavigationExpansionExpression.State;
-                outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
-                outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                outerState = AdjustState(outerState, outerNavigationExpansionExpression);
+
+                //var currentParameter = outerState.CurrentParameter;
+                //outerState = outerNavigationExpansionExpression.State;
+                //outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
+                //outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             // remap inner selector in the context of the outer
@@ -341,7 +366,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     var foo2 = ExpressionExtensions.CombineAndRemapLambdas(collectionSelectorNavigationExpansionExpression.State.PendingSelector, foo, resultSelector.Parameters[1]);
 
                     var foo3 = new ExpressionReplacingVisitor(outerState.CurrentParameter, outerAccess).Visit(foo2.Body);
-                    var foo4 = new ExpressionReplacingVisitor(collectionSelectorNavigationExpansionExpression.State.CurrentParameter, innerAccess).Visit(foo3);
+                    //var foo4 = new ExpressionReplacingVisitor(collectionSelectorNavigationExpansionExpression.State.CurrentParameter, innerAccess).Visit(foo3);
+                    var foo4 = new ExpressionReplacingVisitor(collectionSelectorNavigationExpansionExpression.State.CurrentParameter ?? resultSelector.Parameters[1], innerAccess).Visit(foo3);
 
                     // TODO: optimize out navigation expansions from the collection selector if the collection elements are not present in the final result?
 
@@ -440,19 +466,21 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
             {
                 outerSource = outerNavigationExpansionExpression.Operand;
-                var currentParameter = outerState.CurrentParameter;
-                outerState = outerNavigationExpansionExpression.State;
-                outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
-                outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                outerState = AdjustState(outerState, outerNavigationExpansionExpression);
+                //var currentParameter = outerState.CurrentParameter;
+                //outerState = outerNavigationExpansionExpression.State;
+                //outerState.CurrentParameter = outerState.CurrentParameter ?? currentParameter;
+                //outerState.PendingSelector = outerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
             {
                 innerSource = innerNavigationExpansionExpression.Operand;
-                var currentParameter = innerState.CurrentParameter;
-                innerState = innerNavigationExpansionExpression.State;
-                innerState.CurrentParameter = innerState.CurrentParameter ?? currentParameter;
-                innerState.PendingSelector = innerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
+                innerState = AdjustState(innerState, innerNavigationExpansionExpression);
+                //var currentParameter = innerState.CurrentParameter;
+                //innerState = innerNavigationExpansionExpression.State;
+                //innerState.CurrentParameter = innerState.CurrentParameter ?? currentParameter;
+                //innerState.PendingSelector = innerState.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
             var combinedOuterKeySelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector, outerKeySelector);
