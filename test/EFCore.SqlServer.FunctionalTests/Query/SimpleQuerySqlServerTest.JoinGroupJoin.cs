@@ -125,17 +125,16 @@ WHERE [t].[CustomerID] = N'ALFKI'");
         {
             await base.Join_customers_orders_with_subquery_anonymous_property_method(isAsync);
 
-            AssertContainsSql(
-                @"SELECT [c].[CustomerID]
-FROM [Customers] AS [c]",
-                //
-                @"SELECT [t].[OrderID], [t].[CustomerID], [t].[EmployeeID], [t].[OrderDate]
-FROM (
+            AssertSql(
+                @"SELECT [t].[OrderID], [t].[CustomerID], [t].[EmployeeID], [t].[OrderDate] AS [Shadow]
+FROM [Customers] AS [c]
+INNER JOIN (
     SELECT [o2].[OrderID], [o2].[CustomerID], [o2].[EmployeeID], [o2].[OrderDate]
     FROM [Orders] AS [o2]
     ORDER BY [o2].[OrderID]
     OFFSET 0 ROWS
-) AS [t]");
+) AS [t] ON [c].[CustomerID] = [t].[CustomerID]
+WHERE [t].[CustomerID] = N'ALFKI'");
         }
 
         public override async Task Join_customers_orders_with_subquery_anonymous_property_method_with_take(bool isAsync)

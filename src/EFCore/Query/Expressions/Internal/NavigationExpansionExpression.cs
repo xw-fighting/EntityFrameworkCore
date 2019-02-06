@@ -92,7 +92,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public void Print([NotNull] ExpressionPrinter expressionPrinter)
         {
-            expressionPrinter.Print(Operand);
+            expressionPrinter.Visit(Operand);
         }
 
         public static IOrderedQueryable<TElement> ToOrdered<TElement>(IQueryable<TElement> source)

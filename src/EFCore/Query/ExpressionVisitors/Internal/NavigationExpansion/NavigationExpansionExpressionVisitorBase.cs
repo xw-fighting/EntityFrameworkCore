@@ -13,7 +13,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         {
             if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
-                var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression.RootParameter);
+                // TODO: hack, navigation binding would convert "naked" ParameterExpression into NavigationBindingExpression
+                // in that case, we want to unwrap the root
+                var newRootParameter = navigationBindingExpression.RootParameter;
+                var newRootParameterVisitResult = Visit(navigationBindingExpression.RootParameter);
+                if (newRootParameterVisitResult is NavigationBindingExpression nbe)
+                {
+                    newRootParameter = nbe.RootParameter;
+                }
+
                 var newOperand = Visit(navigationBindingExpression.Operand);
 
                 return newRootParameter != navigationBindingExpression.RootParameter || newOperand != navigationBindingExpression.Operand
