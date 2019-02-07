@@ -39,6 +39,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         protected MethodInfo QueryableDistinctMethodInfo { get; set; }
         protected MethodInfo QueryableTakeMethodInfo { get; set; }
 
+        protected MethodInfo QueryableOfType { get; set; }
+
         protected MethodInfo EnumerableWhereMethodInfo { get; set; }
 
         protected MethodInfo EnumerableFirstPredicateMethodInfo { get; set; }
@@ -86,6 +88,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             QueryableAny = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 1).Single();
             QueryableAnyPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 2).Single();
             QueryableContains = queryableMethods.Where(m => m.Name == nameof(Queryable.Contains) && m.GetParameters().Count() == 2).Single();
+
+            QueryableOfType = queryableMethods.Where(m => m.Name == nameof(Queryable.OfType) && m.GetParameters().Count() == 1).Single();
 
             var enumerableMethods = typeof(Enumerable).GetMethods().ToList();
 

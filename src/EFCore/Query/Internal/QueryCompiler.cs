@@ -199,28 +199,27 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 }
             }
 
-            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
-            {
-                if (methodCallExpression.ToString().EndsWith(@"uired_FK1]).Outer.Outer.Inner.Outer.Outer.Outer.Outer, ""Id"")"))
-                {
-
-                }
-
-                if (methodCallExpression.Method.Name == "Property")
-                {
-
-                }
-
-                var result = base.VisitMethodCall(methodCallExpression);
-
-                return result;
-            }
-
             protected override Expression VisitSubQuery(SubQueryExpression subQueryExpression)
             {
                 subQueryExpression.QueryModel.TransformExpressions(Visit);
 
                 return base.VisitSubQuery(subQueryExpression);
+            }
+        }
+
+        private class AnonymousObjectAccessSimplifyingExpressionVisitor : RelinqExpressionVisitor
+        {
+            protected override Expression VisitMember(MemberExpression memberExpression)
+            {
+                if (memberExpression.Expression is NewExpression newExpression
+                    && newExpression.Type.Name.Contains("__AnonymousType"))
+                {
+                    var matchingMemberIndex = newExpression.Members.Select((m, i) => new { match = m == memberExpression.Member, i }).Where(r => r.match).Single().i;
+
+                    return newExpression.Arguments[matchingMemberIndex];
+                }
+
+                return base.VisitMember(memberExpression);
             }
         }
 
@@ -236,6 +235,9 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             // this is temporary, until relinq is removed
             var tirev = new TransparentIdentifierRemovingExpressionVisitor();
             queryModel.TransformExpressions(tirev.Visit);
+
+            var atasev = new AnonymousObjectAccessSimplifyingExpressionVisitor();
+            queryModel.TransformExpressions(atasev.Visit);
 
             var resultItemType
                 = (queryModel.GetOutputDataInfo()
@@ -390,6 +392,9 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             // this is temporary, until relinq is removed
             var tirev = new TransparentIdentifierRemovingExpressionVisitor();
             queryModel.TransformExpressions(tirev.Visit);
+
+            var atasev = new AnonymousObjectAccessSimplifyingExpressionVisitor();
+            queryModel.TransformExpressions(atasev.Visit);
 
             var resultItemType
                 = (queryModel.GetOutputDataInfo()

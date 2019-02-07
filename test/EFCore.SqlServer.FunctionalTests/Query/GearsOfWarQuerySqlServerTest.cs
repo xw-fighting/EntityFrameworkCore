@@ -1255,8 +1255,8 @@ WHERE [g].[Discriminator] IN (N'Officer', N'Gear')");
 
             AssertSql(
                 @"SELECT CASE
-    WHEN [t0].[SquadId] IS NOT NULL
-    THEN [t.Gear.AssignedCity].[Name] ELSE NULL
+    WHEN [t.Gear.Squad].[Id] IS NOT NULL
+    THEN [t.Gear.Squad.AssignedCity].[Name] ELSE NULL
 END
 FROM [Tags] AS [t]
 LEFT JOIN (
@@ -1264,7 +1264,8 @@ LEFT JOIN (
     FROM [Gears] AS [t.Gear]
     WHERE [t.Gear].[Discriminator] IN (N'Officer', N'Gear')
 ) AS [t0] ON ([t].[GearNickName] = [t0].[Nickname]) AND ([t].[GearSquadId] = [t0].[SquadId])
-LEFT JOIN [Cities] AS [t.Gear.AssignedCity] ON [t0].[AssignedCityName] = [t.Gear.AssignedCity].[Name]");
+LEFT JOIN [Squads] AS [t.Gear.Squad] ON [t0].[SquadId] = [t.Gear.Squad].[Id]
+LEFT JOIN [Cities] AS [t.Gear.Squad.AssignedCity] ON [t0].[AssignedCityName] = [t.Gear.Squad.AssignedCity].[Name]");
         }
 
         public override async Task Select_null_propagation_works_for_navigations_with_composite_keys(bool isAsync)
@@ -2170,7 +2171,7 @@ FROM [Cities] AS [c]
 WHERE ([c].[Location] = 'Unknown') AND ((
     SELECT COUNT(*)
     FROM [Gears] AS [g]
-    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[Nickname] = N'Paduk')) AND ([c].[Name] = [g].[CityOrBirthName])
+    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([c].[Name] = [g].[CityOrBirthName])) AND ([g].[Nickname] = N'Paduk')
 ) = 1)");
         }
 
@@ -6680,10 +6681,10 @@ WHERE [g1].[Discriminator] IN (N'Officer', N'Gear') AND [g2].[Discriminator] IN 
             await base.Join_on_entity_qsre_keys_inheritance(isAsync);
 
             AssertSql(
-                @"SELECT [g].[FullName] AS [GearName], [o].[FullName] AS [OfficerName]
+                @"SELECT [g].[FullName] AS [GearName], [g0].[FullName] AS [OfficerName]
 FROM [Gears] AS [g]
-INNER JOIN [Gears] AS [o] ON ([g].[Nickname] = [o].[Nickname]) AND ([g].[SquadId] = [o].[SquadId])
-WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND ([o].[Discriminator] = N'Officer')");
+INNER JOIN [Gears] AS [g0] ON ([g].[Nickname] = [g0].[Nickname]) AND ([g].[SquadId] = [g0].[SquadId])
+WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND ([g0].[Discriminator] = N'Officer')");
         }
 
         public override async Task Join_on_entity_qsre_keys_outer_key_is_navigation(bool isAsync)
@@ -6967,7 +6968,7 @@ WHERE ([s].[Name] = N'Kilo') AND (COALESCE((
                 @"SELECT [s].[Name], COALESCE((
     SELECT TOP(1) 42
     FROM [Gears] AS [g]
-    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND ([s].[Id] = [g].[SquadId])
+    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([s].[Id] = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)
 ), 0) AS [Gear]
 FROM [Squads] AS [s]");
         }
@@ -6993,7 +6994,7 @@ FROM [Squads] AS [s]");
                 @"SELECT [s].[Name], CAST(COALESCE((
     SELECT TOP(1) CAST(1 AS bit)
     FROM [Gears] AS [g]
-    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND ([s].[Id] = [g].[SquadId])
+    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([s].[Id] = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)
 ), 0) AS bit) AS [Gear]
 FROM [Squads] AS [s]");
         }
@@ -7010,13 +7011,13 @@ FROM [Squads] AS [s]",
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])",
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)",
                 //
                 @"@_outer_Id='2'
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])");
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)");
         }
 
         public override async Task Select_subquery_projecting_multiple_constants_inside_anonymous(bool isAsync)
@@ -7483,7 +7484,7 @@ WHERE [g].[Discriminator] IN (N'Officer', N'Gear')");
                 @"SELECT CAST(COALESCE((
     SELECT TOP(1) [w].[IsAutomatic]
     FROM [Weapons] AS [w]
-    WHERE ([w].[Name] = N'BFG') AND ([g].[FullName] = [w].[OwnerFullName])
+    WHERE ([g].[FullName] = [w].[OwnerFullName]) AND ([w].[Name] = N'BFG')
     ORDER BY [w].[Id]
 ), 0) AS bit)
 FROM [Gears] AS [g]
@@ -7498,7 +7499,7 @@ WHERE [g].[Discriminator] IN (N'Officer', N'Gear')");
                 @"SELECT (
     SELECT TOP(1) [w].[IsAutomatic]
     FROM [Weapons] AS [w]
-    WHERE ([w].[Name] = N'BFG') AND ([g].[FullName] = [w].[OwnerFullName])
+    WHERE ([g].[FullName] = [w].[OwnerFullName]) AND ([w].[Name] = N'BFG')
     ORDER BY [w].[Id]
 )
 FROM [Gears] AS [g]
@@ -7546,13 +7547,13 @@ WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)"
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE (CHARINDEX(N'Lancer', [w0].[Name]) > 0) AND (@_outer_FullName = [w0].[OwnerFullName])",
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND (CHARINDEX(N'Lancer', [w0].[Name]) > 0)",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE (CHARINDEX(N'Lancer', [w0].[Name]) > 0) AND (@_outer_FullName = [w0].[OwnerFullName])");
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND (CHARINDEX(N'Lancer', [w0].[Name]) > 0)");
         }
 
         public override async Task Select_subquery_distinct_singleordefault_boolean_with_pushdown(bool isAsync)
@@ -7624,13 +7625,13 @@ WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)"
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])",
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])");
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')");
         }
 
         public override async Task Select_subquery_distinct_singleordefault_boolean_empty_with_pushdown(bool isAsync)
@@ -7648,7 +7649,7 @@ SELECT TOP(2) [t0].[IsAutomatic]
 FROM (
     SELECT DISTINCT [w0].*
     FROM [Weapons] AS [w0]
-    WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])
+    WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')
 ) AS [t0]",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
@@ -7657,7 +7658,7 @@ SELECT TOP(2) [t0].[IsAutomatic]
 FROM (
     SELECT DISTINCT [w0].*
     FROM [Weapons] AS [w0]
-    WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])
+    WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')
 ) AS [t0]");
         }
 
@@ -8199,6 +8200,27 @@ WHERE [t].[Id] = @__p_0",
 SELECT [t].[Id], [t].[GearNickName], [t].[GearSquadId], [t].[Note]
 FROM [Tags] AS [t]
 WHERE [t].[Id] = @__p_0");
+        }
+
+        public override void OfTypeNav1()
+        {
+            base.OfTypeNav1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void OfTypeNav2()
+        {
+            base.OfTypeNav2();
+
+            AssertSql(
+                @"SELECT [g].[Nickname], [g].[SquadId], [g].[AssignedCityName], [g].[CityOrBirthName], [g].[Discriminator], [g].[FullName], [g].[HasSoulPatch], [g].[LeaderNickname], [g].[LeaderSquadId], [g].[Rank]
+FROM [Gears] AS [g]
+LEFT JOIN [Tags] AS [g.Tag] ON ([g].[Nickname] = [g.Tag].[GearNickName]) AND ([g].[SquadId] = [g.Tag].[GearSquadId])
+INNER JOIN [Weapons] AS [w] ON [g].[FullName] = [w].[OwnerFullName]
+LEFT JOIN [Tags] AS [o.Tag] ON ([g].[Nickname] = [o.Tag].[GearNickName]) AND ([g].[SquadId] = [o.Tag].[GearSquadId])
+WHERE (([g].[Discriminator] = N'Officer') AND (([g.Tag].[Note] <> N'Foo') OR [g.Tag].[Note] IS NULL)) AND (([o.Tag].[Note] <> N'Bar') OR [o.Tag].[Note] IS NULL)");
         }
 
         private void AssertSql(params string[] expected)

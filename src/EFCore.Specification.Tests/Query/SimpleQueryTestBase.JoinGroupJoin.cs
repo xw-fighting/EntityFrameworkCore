@@ -172,7 +172,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                         o1.o2,
                         Shadow = EF.Property<DateTime?>(o1.o2, "OrderDate")
                     },
-                e => e.o1.o2.OrderID);
+                e => e.o1.o2.OrderID,
+                entryCount: 6);
         }
 
         [ConditionalTheory]

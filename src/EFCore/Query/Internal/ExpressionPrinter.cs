@@ -45,7 +45,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             { ExpressionType.Divide, " / " },
             { ExpressionType.Modulo, " % " },
             { ExpressionType.And, " & " },
-            { ExpressionType.Or, " | " }
+            { ExpressionType.Or, " | " },
+            { ExpressionType.ExclusiveOr, " ^ " }
         };
 
         private bool _highlightNonreducibleNodes;
@@ -258,6 +259,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 case ExpressionType.Modulo:
                 case ExpressionType.And:
                 case ExpressionType.Or:
+                case ExpressionType.ExclusiveOr:
                     VisitBinary((BinaryExpression)expression);
                     break;
 

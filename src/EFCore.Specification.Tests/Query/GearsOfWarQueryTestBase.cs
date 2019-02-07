@@ -7217,6 +7217,27 @@ namespace Microsoft.EntityFrameworkCore.Query
                       select t);
         }
 
+        [ConditionalFact]
+        public virtual void OfTypeNav1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").OfType<Officer>().Where(o => o.Tag.Note != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void OfTypeNav2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").Join(ctx.Weapons, g => g.FullName, w => w.OwnerFullName, (o, i) => o).OfType<Officer>().Where(o => o.Tag.Note != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        // TODO: add test for navigations that are only defined on derived type (e.g. officer.reports or something on locust horde etc)
 
         protected GearsOfWarContext CreateContext() => Fixture.CreateContext();
 

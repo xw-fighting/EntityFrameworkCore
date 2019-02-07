@@ -1194,8 +1194,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                         o.Mod
                     },
                 elementSorter: e => e.e2.EmployeeID + " " + e.o2.OrderID,
-                // issue #8956
-                entryCount: 3);
+                entryCount: 5);
         }
 
         [ConditionalTheory]
