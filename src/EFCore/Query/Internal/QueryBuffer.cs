@@ -497,7 +497,28 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
-        public virtual TCollection CorrelateSubquery<TInner, TOut, TCollection>(
+        public virtual MyList<TOut> CorrelateSubquery<TInner, TOut>(
+            int correlatedCollectionId,
+            INavigation navigation,
+            in MaterializedAnonymousObject outerKey,
+            bool tracking,
+            Func<IEnumerable<Tuple<TInner, MaterializedAnonymousObject, MaterializedAnonymousObject>>> correlatedCollectionFactory,
+            Func<MaterializedAnonymousObject, MaterializedAnonymousObject, bool> correlationPredicate)
+            where TInner : TOut
+            => CorrelateSubquery<TInner, TOut, MyList<TOut>>(
+                correlatedCollectionId,
+                navigation,
+                /*resultCollectionFactory*/ n => new MyList<TOut>(),
+                in outerKey,
+                tracking,
+                correlatedCollectionFactory,
+                correlationPredicate);
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public TCollection CorrelateSubquery<TInner, TOut, TCollection>(
             int correlatedCollectionId,
             INavigation navigation,
             Func<INavigation, TCollection> resultCollectionFactory,
@@ -590,6 +611,45 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 }
             }
         }
+
+        //Task<MyList<TOut>> CorrelateSubqueryAsync<TInner, TOut>(
+        //    int correlatedCollectionId,
+        //    [NotNull] INavigation navigation,
+        //    MaterializedAnonymousObject outerKey,
+        //    bool tracking,
+        //    [NotNull] Func<IAsyncEnumerable<Tuple<TInner, MaterializedAnonymousObject, MaterializedAnonymousObject>>> correlatedCollectionFactory,
+        //    [NotNull] Func<MaterializedAnonymousObject, MaterializedAnonymousObject, bool> correlationPredicate,
+        //    CancellationToken cancellationToken)
+        //    where TInner : TOut
+        //    => CorrelateSubqueryAsync<TInner, TOut, MyList<TOut>>(
+        //        correlatedCollectionId,
+        //        navigation,
+        //        /*resultCollectionFactory*/ n => new MyList<TOut>(),
+        //        outerKey,
+        //        tracking,
+        //        correlatedCollectionFactory,
+        //        correlationPredicate,
+        //        cancellationToken);
+
+
+        Task<MyList<TOut>> IQueryBuffer.CorrelateSubqueryAsync<TInner, TOut>(
+            int correlatedCollectionId,
+            INavigation navigation,
+            MaterializedAnonymousObject outerKey,
+            bool tracking,
+            Func<IAsyncEnumerable<Tuple<TInner, MaterializedAnonymousObject, MaterializedAnonymousObject>>> correlatedCollectionFactory,
+            Func<MaterializedAnonymousObject, MaterializedAnonymousObject, bool> correlationPredicate,
+            CancellationToken cancellationToken)
+            //where TInner : TOut
+            => CorrelateSubqueryAsync<TInner, TOut, MyList<TOut>>(
+                correlatedCollectionId,
+                navigation,
+                /*resultCollectionFactory*/ n => new MyList<TOut>(),
+                outerKey,
+                tracking,
+                correlatedCollectionFactory,
+                correlationPredicate,
+                cancellationToken);
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used

@@ -85,10 +85,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     var collectionNavigationElementType = lastNavigation.ForeignKey.DeclaringEntityType.ClrType;
                     var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
+                    var caller = navigationBindingExpression.Operand is MemberExpression memberExpression
+                        ? memberExpression.Expression
+                        : ((MethodCallExpression)navigationBindingExpression.Operand).Arguments[0];
+
                     // TODO: this could be other things too: EF.Property and maybe field
                     var newNavigations = navigationBindingExpression.Navigations.Take(navigationBindingExpression.Navigations.Count - 1).ToList();
                     var outerBinding = new NavigationBindingExpression(
-                        ((MemberExpression)navigationBindingExpression.Operand).Expression,
+                        caller,
+                        //((MemberExpression)navigationBindingExpression.Operand).Expression,
                         navigationBindingExpression.RootParameter,
                         newNavigations,
                         newNavigations.LastOrDefault()?.GetTargetType() ?? lastNavigation.DeclaringEntityType,
@@ -125,11 +130,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             {
                 var newOuterKeyNullCheck = Visit(nullSafeEqualExpression.OuterKeyNullCheck);
                 var newEqualExpression = (BinaryExpression)Visit(nullSafeEqualExpression.EqualExpression);
+                var newNavigationRootExpression = Visit(nullSafeEqualExpression.NavigationRootExpression);
 
                 if (newOuterKeyNullCheck != nullSafeEqualExpression.OuterKeyNullCheck
-                    || newEqualExpression != nullSafeEqualExpression.EqualExpression)
+                    || newEqualExpression != nullSafeEqualExpression.EqualExpression
+                    || newNavigationRootExpression != nullSafeEqualExpression.NavigationRootExpression)
                 {
-                    return new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression);
+                    return new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression, newNavigationRootExpression, nullSafeEqualExpression.Navigations);
                 }
             }
 
@@ -243,7 +250,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             return new NullSafeEqualExpression(
                 outerNullProtection,
-                Expression.Equal(outerKeyExpression, innerKeyExpression));
+                Expression.Equal(outerKeyExpression, innerKeyExpression),
+                navigationRootExpression,
+                navigations.ToList());
         }
     }
 

@@ -331,12 +331,12 @@ namespace Microsoft.EntityFrameworkCore.Query
             var navigationRewritingExpressionVisitor = _navigationRewritingExpressionVisitorFactory.Create(this);
             navigationRewritingExpressionVisitor.InjectSubqueryToCollectionsInProjection(queryModel);
 
-            var correlatedCollectionFinder = new CorrelatedCollectionFindingExpressionVisitor(this, IsTrackingQuery(queryModel));
+            //var correlatedCollectionFinder = new CorrelatedCollectionFindingExpressionVisitor(this, IsTrackingQuery(queryModel));
 
-            if (!queryModel.ResultOperators.Any(r => r is GroupResultOperator))
-            {
-                queryModel.SelectClause.TransformExpressions(correlatedCollectionFinder.Visit);
-            }
+            //if (!queryModel.ResultOperators.Any(r => r is GroupResultOperator))
+            //{
+            //    queryModel.SelectClause.TransformExpressions(correlatedCollectionFinder.Visit);
+            //}
 
             navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
 
@@ -1146,7 +1146,8 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             var correlatedCollectionOptimizer = new CorrelatedCollectionOptimizingVisitor(
                 this,
-                queryModel);
+                queryModel,
+                IsTrackingQuery(queryModel));
 
             var newSelector = correlatedCollectionOptimizer.Visit(queryModel.SelectClause.Selector);
             if (newSelector != queryModel.SelectClause.Selector)

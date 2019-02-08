@@ -1670,13 +1670,13 @@ ORDER BY [g].[Nickname]",
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE (CHARINDEX(N'Lancer', [w0].[Name]) > 0) AND (@_outer_FullName = [w0].[OwnerFullName])",
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND (CHARINDEX(N'Lancer', [w0].[Name]) > 0)",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
 
 SELECT DISTINCT TOP(2) [w0].[IsAutomatic]
 FROM [Weapons] AS [w0]
-WHERE (CHARINDEX(N'Lancer', [w0].[Name]) > 0) AND (@_outer_FullName = [w0].[OwnerFullName])");
+WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND (CHARINDEX(N'Lancer', [w0].[Name]) > 0)");
         }
 
         public override async Task Where_subquery_distinct_singleordefault_boolean_with_pushdown(bool isAsync)
@@ -5132,51 +5132,30 @@ WHERE ([ps].[SquadId] < 2) AND (@_outer_Id1 = [ps].[MissionId])");
 FROM [Squads] AS [s]
 ORDER BY [s].[Id]",
                 //
-                @"SELECT [t].[Id], [m.Mission].[Id], [s.Missions].[SquadId]
+                @"SELECT [t].[Id], [s.Missions].[SquadId], [sm.Mission].[Id]
 FROM [SquadMissions] AS [s.Missions]
-INNER JOIN [Missions] AS [m.Mission] ON [s.Missions].[MissionId] = [m.Mission].[Id]
+INNER JOIN [Missions] AS [sm.Mission] ON [s.Missions].[MissionId] = [sm.Mission].[Id]
 INNER JOIN (
     SELECT [s0].[Id]
     FROM [Squads] AS [s0]
 ) AS [t] ON [s.Missions].[SquadId] = [t].[Id]
 WHERE [s.Missions].[MissionId] < 42
-ORDER BY [t].[Id]",
+ORDER BY [t].[Id], [s.Missions].[SquadId], [s.Missions].[MissionId], [sm.Mission].[Id]",
                 //
-                @"@_outer_Id='3'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])",
-                //
-                @"@_outer_Id='3'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])",
-                //
-                @"@_outer_Id='1'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])",
-                //
-                @"@_outer_Id='2'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])",
-                //
-                @"@_outer_Id='1'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])",
-                //
-                @"@_outer_Id='2'
-
-SELECT [ps].[SquadId], [ps].[MissionId]
-FROM [SquadMissions] AS [ps]
-WHERE ([ps].[SquadId] < 7) AND (@_outer_Id = [ps].[MissionId])");
+                @"SELECT [sm.Mission.ParticipatingSquads].[SquadId], [sm.Mission.ParticipatingSquads].[MissionId], [t1].[Id], [t1].[SquadId], [t1].[MissionId], [t1].[Id0]
+FROM [SquadMissions] AS [sm.Mission.ParticipatingSquads]
+INNER JOIN (
+    SELECT [t0].[Id], [s.Missions0].[SquadId], [s.Missions0].[MissionId], [sm.Mission0].[Id] AS [Id0]
+    FROM [SquadMissions] AS [s.Missions0]
+    INNER JOIN [Missions] AS [sm.Mission0] ON [s.Missions0].[MissionId] = [sm.Mission0].[Id]
+    INNER JOIN (
+        SELECT [s1].[Id]
+        FROM [Squads] AS [s1]
+    ) AS [t0] ON [s.Missions0].[SquadId] = [t0].[Id]
+    WHERE [s.Missions0].[MissionId] < 42
+) AS [t1] ON [sm.Mission.ParticipatingSquads].[MissionId] = [t1].[Id0]
+WHERE [sm.Mission.ParticipatingSquads].[SquadId] < 7
+ORDER BY [t1].[Id], [t1].[SquadId], [t1].[MissionId], [t1].[Id0]");
         }
 
         public override async Task Correlated_collections_nested_with_custom_ordering(bool isAsync)
@@ -5637,49 +5616,49 @@ ORDER BY [GearNickname], [s].[Id] DESC",
 
 SELECT [w].[Id], [w].[AmmunitionType], [w].[IsAutomatic], [w].[Name], [w].[OwnerFullName], [w].[SynergyWithId]
 FROM [Weapons] AS [w]
-WHERE (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL)) AND (@_outer_FullName = [w].[OwnerFullName])",
+WHERE (@_outer_FullName = [w].[OwnerFullName]) AND (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL))",
                 //
                 @"@_outer_Id='2'
 
-SELECT [m].[Nickname], [m].[SquadId], [m].[AssignedCityName], [m].[CityOrBirthName], [m].[Discriminator], [m].[FullName], [m].[HasSoulPatch], [m].[LeaderNickname], [m].[LeaderSquadId], [m].[Rank]
-FROM [Gears] AS [m]
-WHERE ([m].[Discriminator] IN (N'Officer', N'Gear') AND ([m].[HasSoulPatch] = 0)) AND (@_outer_Id = [m].[SquadId])",
+SELECT [g0].[Nickname], [g0].[SquadId], [g0].[AssignedCityName], [g0].[CityOrBirthName], [g0].[Discriminator], [g0].[FullName], [g0].[HasSoulPatch], [g0].[LeaderNickname], [g0].[LeaderSquadId], [g0].[Rank]
+FROM [Gears] AS [g0]
+WHERE ([g0].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g0].[SquadId])) AND ([g0].[HasSoulPatch] = 0)",
                 //
                 @"@_outer_FullName='Damon Baird' (Size = 450)
 
 SELECT [w].[Id], [w].[AmmunitionType], [w].[IsAutomatic], [w].[Name], [w].[OwnerFullName], [w].[SynergyWithId]
 FROM [Weapons] AS [w]
-WHERE (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL)) AND (@_outer_FullName = [w].[OwnerFullName])",
+WHERE (@_outer_FullName = [w].[OwnerFullName]) AND (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL))",
                 //
                 @"@_outer_Id='1'
 
-SELECT [m].[Nickname], [m].[SquadId], [m].[AssignedCityName], [m].[CityOrBirthName], [m].[Discriminator], [m].[FullName], [m].[HasSoulPatch], [m].[LeaderNickname], [m].[LeaderSquadId], [m].[Rank]
-FROM [Gears] AS [m]
-WHERE ([m].[Discriminator] IN (N'Officer', N'Gear') AND ([m].[HasSoulPatch] = 0)) AND (@_outer_Id = [m].[SquadId])",
+SELECT [g0].[Nickname], [g0].[SquadId], [g0].[AssignedCityName], [g0].[CityOrBirthName], [g0].[Discriminator], [g0].[FullName], [g0].[HasSoulPatch], [g0].[LeaderNickname], [g0].[LeaderSquadId], [g0].[Rank]
+FROM [Gears] AS [g0]
+WHERE ([g0].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g0].[SquadId])) AND ([g0].[HasSoulPatch] = 0)",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
 
 SELECT [w].[Id], [w].[AmmunitionType], [w].[IsAutomatic], [w].[Name], [w].[OwnerFullName], [w].[SynergyWithId]
 FROM [Weapons] AS [w]
-WHERE (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL)) AND (@_outer_FullName = [w].[OwnerFullName])",
+WHERE (@_outer_FullName = [w].[OwnerFullName]) AND (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL))",
                 //
                 @"@_outer_Id='2'
 
-SELECT [m].[Nickname], [m].[SquadId], [m].[AssignedCityName], [m].[CityOrBirthName], [m].[Discriminator], [m].[FullName], [m].[HasSoulPatch], [m].[LeaderNickname], [m].[LeaderSquadId], [m].[Rank]
-FROM [Gears] AS [m]
-WHERE ([m].[Discriminator] IN (N'Officer', N'Gear') AND ([m].[HasSoulPatch] = 0)) AND (@_outer_Id = [m].[SquadId])",
+SELECT [g0].[Nickname], [g0].[SquadId], [g0].[AssignedCityName], [g0].[CityOrBirthName], [g0].[Discriminator], [g0].[FullName], [g0].[HasSoulPatch], [g0].[LeaderNickname], [g0].[LeaderSquadId], [g0].[Rank]
+FROM [Gears] AS [g0]
+WHERE ([g0].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g0].[SquadId])) AND ([g0].[HasSoulPatch] = 0)",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
 
 SELECT [w].[Id], [w].[AmmunitionType], [w].[IsAutomatic], [w].[Name], [w].[OwnerFullName], [w].[SynergyWithId]
 FROM [Weapons] AS [w]
-WHERE (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL)) AND (@_outer_FullName = [w].[OwnerFullName])",
+WHERE (@_outer_FullName = [w].[OwnerFullName]) AND (([w].[IsAutomatic] = 1) OR (([w].[Name] <> N'foo') OR [w].[Name] IS NULL))",
                 //
                 @"@_outer_Id='1'
 
-SELECT [m].[Nickname], [m].[SquadId], [m].[AssignedCityName], [m].[CityOrBirthName], [m].[Discriminator], [m].[FullName], [m].[HasSoulPatch], [m].[LeaderNickname], [m].[LeaderSquadId], [m].[Rank]
-FROM [Gears] AS [m]
-WHERE ([m].[Discriminator] IN (N'Officer', N'Gear') AND ([m].[HasSoulPatch] = 0)) AND (@_outer_Id = [m].[SquadId])");
+SELECT [g0].[Nickname], [g0].[SquadId], [g0].[AssignedCityName], [g0].[CityOrBirthName], [g0].[Discriminator], [g0].[FullName], [g0].[HasSoulPatch], [g0].[LeaderNickname], [g0].[LeaderSquadId], [g0].[Rank]
+FROM [Gears] AS [g0]
+WHERE ([g0].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g0].[SquadId])) AND ([g0].[HasSoulPatch] = 0)");
         }
 
         public override async Task Correlated_collections_with_Skip(bool isAsync)
@@ -6981,7 +6960,7 @@ FROM [Squads] AS [s]");
                 @"SELECT [s].[Name], (
     SELECT TOP(1) N'Foo'
     FROM [Gears] AS [g]
-    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND ([s].[Id] = [g].[SquadId])
+    WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([s].[Id] = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)
 ) AS [Gear]
 FROM [Squads] AS [s]");
         }
@@ -7032,13 +7011,13 @@ FROM [Squads] AS [s]",
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])",
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)",
                 //
                 @"@_outer_Id='2'
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])");
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)");
         }
 
         public override async Task Include_with_order_by_constant(bool isAsync)
@@ -7132,13 +7111,13 @@ FROM [Squads] AS [s]",
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])",
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)",
                 //
                 @"@_outer_Id='2'
 
 SELECT TOP(1) 1
 FROM [Gears] AS [g]
-WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND ([g].[HasSoulPatch] = 1)) AND (@_outer_Id = [g].[SquadId])");
+WHERE ([g].[Discriminator] IN (N'Officer', N'Gear') AND (@_outer_Id = [g].[SquadId])) AND ([g].[HasSoulPatch] = 1)");
         }
 
         public override async Task Include_with_order_by_constant_null_of_non_mapped_type(bool isAsync)
@@ -7599,7 +7578,7 @@ SELECT TOP(2) [t0].[IsAutomatic]
 FROM (
     SELECT DISTINCT [w0].*
     FROM [Weapons] AS [w0]
-    WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])
+    WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')
 ) AS [t0]",
                 //
                 @"@_outer_FullName='Marcus Fenix' (Size = 450)
@@ -7608,7 +7587,7 @@ SELECT TOP(2) [t0].[IsAutomatic]
 FROM (
     SELECT DISTINCT [w0].*
     FROM [Weapons] AS [w0]
-    WHERE ([w0].[Name] = N'BFG') AND (@_outer_FullName = [w0].[OwnerFullName])
+    WHERE (@_outer_FullName = [w0].[OwnerFullName]) AND ([w0].[Name] = N'BFG')
 ) AS [t0]");
         }
 
@@ -8131,7 +8110,7 @@ FROM [Gears] AS [g]
 WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND (([g].[FullName] <> N'Dom') AND (
     SELECT TOP(1) [w].[Id]
     FROM [Weapons] AS [w]
-    WHERE ([w].[IsAutomatic] = 1) AND ([g].[FullName] = [w].[OwnerFullName])
+    WHERE ([g].[FullName] = [w].[OwnerFullName]) AND ([w].[IsAutomatic] = 1)
     ORDER BY [w].[Id]
 ) IS NOT NULL)");
         }

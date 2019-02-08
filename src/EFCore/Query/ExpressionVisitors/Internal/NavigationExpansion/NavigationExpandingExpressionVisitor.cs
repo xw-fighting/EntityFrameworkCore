@@ -562,7 +562,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     var result = Expression.Call(selectorMethodInfo, navigationExpansionExpression.Operand, newSelector);
 
                     state.PendingSelector = null;
-                    state.CurrentParameter = null;
+                    //state.CurrentParameter = null;
 
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
@@ -593,6 +593,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     // TODO: need to run thru Expression.Update?
                     source = methodCallExpression;
                 }
+
+                state.CurrentParameter = null;
 
                 // TODO: should we be reusing state?
                 return new NavigationExpansionExpression(

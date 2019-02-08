@@ -937,7 +937,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                         leftKeyAccess,
                         rightKeyAccess,
-                        querySourceReference)));
+                        querySourceReference,
+                        (QuerySourceReferenceExpression)outerQuerySourceReferenceExpression,
+                        navigations)));
 
             subQueryModel.ResultOperators.Add(new FirstResultOperator(returnDefaultWhenEmpty: true));
 
@@ -978,7 +980,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         private static Expression CreateKeyComparisonExpressionForCollectionNavigationSubquery(
             Expression leftExpression,
             Expression rightExpression,
-            Expression leftQsre)
+            Expression leftQsre,
+            QuerySourceReferenceExpression navigationRootExpression,
+            IEnumerable<INavigation> navigations)
         {
             if (leftExpression.Type != rightExpression.Type)
             {
@@ -1002,7 +1006,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     leftQsre,
                     Expression.Constant(null, leftQsre.Type));
 
-            return new NullSafeEqualExpression(outerNullProtection, Expression.Equal(leftExpression, rightExpression));
+            return new NullSafeEqualExpression(
+                outerNullProtection,
+                Expression.Equal(leftExpression, rightExpression),
+                navigationRootExpression,
+                navigations);
         }
 
         private Expression RewriteNavigationsIntoJoins(
@@ -1074,7 +1082,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                             CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                                 leftKeyAccess,
                                 rightKeyAccess,
-                                sourceExpression)));
+                                sourceExpression,
+                                outerQuerySourceReferenceExpression,
+                                navigations)));
 
                     return QueryModel.MainFromClause.FromExpression;
                 }
@@ -1368,16 +1378,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 }
             }
 
-            if (QueryModelVisitor.QueryCompilationContext.CorrelatedSubqueryMetadataMap != null)
-            {
-                foreach (var mapping in QueryModelVisitor.QueryCompilationContext.CorrelatedSubqueryMetadataMap)
-                {
-                    if (mapping.Value.ParentQuerySource == querySourceBeingProcessed)
-                    {
-                        mapping.Value.ParentQuerySource = resultQuerySource;
-                    }
-                }
-            }
+            //if (QueryModelVisitor.QueryCompilationContext.CorrelatedSubqueryMetadataMap != null)
+            //{
+            //    foreach (var mapping in QueryModelVisitor.QueryCompilationContext.CorrelatedSubqueryMetadataMap)
+            //    {
+            //        if (mapping.Value.ParentQuerySource == querySourceBeingProcessed)
+            //        {
+            //            mapping.Value.ParentQuerySource = resultQuerySource;
+            //        }
+            //    }
+            //}
         }
 
         private JoinClause BuildJoinFromNavigation(

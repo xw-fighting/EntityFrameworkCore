@@ -50,9 +50,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 var newOuterKeyNullCheck = Visit(nullSafeEqualExpression.OuterKeyNullCheck);
                 var newEqualExpression = (BinaryExpression)Visit(nullSafeEqualExpression.EqualExpression);
+                var newNavigationRootExpression = Visit(nullSafeEqualExpression.NavigationRootExpression);
 
-                return newOuterKeyNullCheck != nullSafeEqualExpression.OuterKeyNullCheck || newEqualExpression != nullSafeEqualExpression.EqualExpression
-                    ? new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression)
+                return newOuterKeyNullCheck != nullSafeEqualExpression.OuterKeyNullCheck || newEqualExpression != nullSafeEqualExpression.EqualExpression || newNavigationRootExpression != nullSafeEqualExpression.NavigationRootExpression
+                    ? new NullSafeEqualExpression(newOuterKeyNullCheck, newEqualExpression, nullSafeEqualExpression.NavigationRootExpression, nullSafeEqualExpression.Navigations)
                     : nullSafeEqualExpression;
             }
 

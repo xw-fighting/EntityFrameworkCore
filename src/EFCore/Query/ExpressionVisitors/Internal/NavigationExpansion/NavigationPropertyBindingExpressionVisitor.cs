@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore.Extensions.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 
@@ -96,18 +97,83 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         protected override Expression VisitMember(MemberExpression memberExpression)
         {
             var newExpression = Visit(memberExpression.Expression);
+            var boundProperty = TryBindProperty(memberExpression, newExpression, memberExpression.Member.Name);
+
+            return boundProperty ?? memberExpression.Update(newExpression);
+        }
+
+
+        //protected override Expression VisitMember(MemberExpression memberExpression)
+        //{
+        //    var newExpression = Visit(memberExpression.Expression);
+        //    if (newExpression is NavigationBindingExpression navigationBindingExpression)
+        //    {
+        //        if (navigationBindingExpression.RootParameter == _rootParameter)
+        //        {
+        //            var navigation = navigationBindingExpression.EntityType.FindNavigation(memberExpression.Member.Name);
+        //            if (navigation != null)
+        //            {
+        //                var navigations = navigationBindingExpression.Navigations.ToList();
+        //                navigations.Add(navigation);
+
+        //                return new NavigationBindingExpression(
+        //                    memberExpression,
+        //                    navigationBindingExpression.RootParameter,
+        //                    navigations,
+        //                    navigation.GetTargetType(),
+        //                    navigationBindingExpression.SourceMapping);
+        //            }
+        //        }
+        //    }
+        //    else
+        //    {
+        //        foreach (var sourceMapping in _sourceMappings)
+        //        {
+        //            var match = TryFindMatchingTransparentIdentifierMapping(memberExpression, sourceMapping.InitialPath, sourceMapping.TransparentIdentifierMapping);
+        //            if (match.rootParameter != null)
+        //            {
+        //                return new NavigationBindingExpression(
+        //                    memberExpression,
+        //                    match.rootParameter,
+        //                    match.navigations,
+        //                    match.navigations.Count > 0 ? match.navigations.Last().GetTargetType() : sourceMapping.RootEntityType,
+        //                    sourceMapping);
+        //            }
+        //        }
+        //    }
+
+        //    return memberExpression.Update(newExpression);
+        //}
+
+        protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+        {
+            if (methodCallExpression.Method.IsEFPropertyMethod())
+            {
+                var newCaller = Visit(methodCallExpression.Arguments[0]);
+                var propertyName = (string)((ConstantExpression)methodCallExpression.Arguments[1]).Value;
+
+                var boundProperty = TryBindProperty(methodCallExpression, newCaller, propertyName);
+
+                return boundProperty ?? methodCallExpression.Update(methodCallExpression.Object, new[] { newCaller, methodCallExpression.Arguments[1] });
+            }
+
+            return base.VisitMethodCall(methodCallExpression);
+        }
+
+        private Expression TryBindProperty(Expression originalExpression, Expression newExpression, string navigationMemberName)
+        {
             if (newExpression is NavigationBindingExpression navigationBindingExpression)
             {
                 if (navigationBindingExpression.RootParameter == _rootParameter)
                 {
-                    var navigation = navigationBindingExpression.EntityType.FindNavigation(memberExpression.Member.Name);
+                    var navigation = navigationBindingExpression.EntityType.FindNavigation(navigationMemberName);
                     if (navigation != null)
                     {
                         var navigations = navigationBindingExpression.Navigations.ToList();
                         navigations.Add(navigation);
 
                         return new NavigationBindingExpression(
-                            memberExpression,
+                            originalExpression,
                             navigationBindingExpression.RootParameter,
                             navigations,
                             navigation.GetTargetType(),
@@ -119,11 +185,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 foreach (var sourceMapping in _sourceMappings)
                 {
-                    var match = TryFindMatchingTransparentIdentifierMapping(memberExpression, sourceMapping.InitialPath, sourceMapping.TransparentIdentifierMapping);
+                    var match = TryFindMatchingTransparentIdentifierMapping(originalExpression, sourceMapping.InitialPath, sourceMapping.TransparentIdentifierMapping);
                     if (match.rootParameter != null)
                     {
                         return new NavigationBindingExpression(
-                            memberExpression,
+                            originalExpression,
                             match.rootParameter,
                             match.navigations,
                             match.navigations.Count > 0 ? match.navigations.Last().GetTargetType() : sourceMapping.RootEntityType,
@@ -132,7 +198,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 }
             }
 
-            return memberExpression.Update(newExpression);
+            return null;
         }
 
         protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)

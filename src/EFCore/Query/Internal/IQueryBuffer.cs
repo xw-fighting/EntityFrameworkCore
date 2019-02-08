@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -105,6 +106,19 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
+        MyList<TOut> CorrelateSubquery<TInner, TOut>(
+            int correlatedCollectionId,
+            [NotNull] INavigation navigation,
+            in MaterializedAnonymousObject outerKey,
+            bool tracking,
+            [NotNull] Func<IEnumerable<Tuple<TInner, MaterializedAnonymousObject, MaterializedAnonymousObject>>> correlatedCollectionFactory,
+            [NotNull] Func<MaterializedAnonymousObject, MaterializedAnonymousObject, bool> correlationPredicate)
+            where TInner : TOut;
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
         Task<TCollection> CorrelateSubqueryAsync<TInner, TOut, TCollection>(
             int correlatedCollectionId,
             [NotNull] INavigation navigation,
@@ -116,5 +130,37 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             CancellationToken cancellationToken)
             where TCollection : ICollection<TOut>
             where TInner : TOut;
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        Task<MyList<TOut>> CorrelateSubqueryAsync<TInner, TOut>(
+            int correlatedCollectionId,
+            [NotNull] INavigation navigation,
+            MaterializedAnonymousObject outerKey,
+            bool tracking,
+            [NotNull] Func<IAsyncEnumerable<Tuple<TInner, MaterializedAnonymousObject, MaterializedAnonymousObject>>> correlatedCollectionFactory,
+            [NotNull] Func<MaterializedAnonymousObject, MaterializedAnonymousObject, bool> correlationPredicate,
+            CancellationToken cancellationToken)
+            where TInner : TOut;
+    }
+
+    public class MyList<T> : List<T>, IOrderedEnumerable<T>
+    {
+        public MyList()
+            : base()
+        {
+        }
+
+        public MyList(ICollection<T> source)
+            : base(source)
+        {
+        }
+
+        public IOrderedEnumerable<T> CreateOrderedEnumerable<TKey>(Func<T, TKey> keySelector, IComparer<TKey> comparer, bool descending)
+            => descending
+            ? this.AsEnumerable().OrderByDescending(keySelector, comparer)
+            : this.AsEnumerable().OrderBy(keySelector, comparer);
     }
 }

@@ -2,10 +2,14 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
+using Remotion.Linq.Clauses.Expressions;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 {
@@ -21,13 +25,19 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         /// </summary>
         public NullSafeEqualExpression(
             [NotNull] Expression outerKeyNullCheck,
-            [NotNull] BinaryExpression equalExpression)
+            [NotNull] BinaryExpression equalExpression,
+            [NotNull] Expression navigationRootExpression,
+            [NotNull] IEnumerable<INavigation> navigations)
         {
             Check.NotNull(outerKeyNullCheck, nameof(outerKeyNullCheck));
             Check.NotNull(equalExpression, nameof(equalExpression));
+            Check.NotNull(navigationRootExpression, nameof(navigationRootExpression));
+            Check.NotNull(navigations, nameof(navigations));
 
             OuterKeyNullCheck = outerKeyNullCheck;
             EqualExpression = equalExpression;
+            NavigationRootExpression = navigationRootExpression;
+            Navigations = navigations.ToList();
         }
 
         /// <summary>
@@ -41,6 +51,24 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         public virtual BinaryExpression EqualExpression { get; }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public virtual Expression NavigationRootExpression { get; set; }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public virtual List<INavigation> Navigations { get; }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public virtual bool CorrelatedCollectionOptimizationCandidate { get; }
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -78,6 +106,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             var newNullCheck = visitor.Visit(OuterKeyNullCheck);
             var newLeft = visitor.Visit(EqualExpression.Left);
             var newRight = visitor.Visit(EqualExpression.Right);
+            var newNavigationRoot = visitor.Visit(NavigationRootExpression);
 
             if (newLeft.Type != newRight.Type
                 && newLeft.Type.UnwrapNullableType() == newRight.Type.UnwrapNullableType())
@@ -95,7 +124,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             return newNullCheck != OuterKeyNullCheck
                    || EqualExpression.Left != newLeft
                    || EqualExpression.Right != newRight
-                ? new NullSafeEqualExpression(newNullCheck, Equal(newLeft, newRight))
+                   || NavigationRootExpression != newNavigationRoot
+                ? new NullSafeEqualExpression(newNullCheck, Equal(newLeft, newRight), newNavigationRoot, Navigations)
                 : this;
         }
 

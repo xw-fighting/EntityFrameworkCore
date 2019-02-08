@@ -4,6 +4,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
@@ -33,11 +34,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         private readonly QueryCompilationContext _queryCompilationContext;
         private readonly QueryModel _parentQueryModel;
 
-        private static readonly MethodInfo _correlateSubqueryMethodInfo
-            = typeof(IQueryBuffer).GetMethod(nameof(IQueryBuffer.CorrelateSubquery));
+        private static readonly MethodInfo _correlateSubqueryWithUserResultTypeMethodInfo
+            = typeof(IQueryBuffer).GetMethods().Where(m => m.Name == nameof(IQueryBuffer.CorrelateSubquery) && m.GetGenericArguments().Count() == 3).Single();
 
-        private static readonly MethodInfo _correlateSubqueryAsyncMethodInfo
-            = typeof(IQueryBuffer).GetMethod(nameof(IQueryBuffer.CorrelateSubqueryAsync));
+        private static readonly MethodInfo _correlateSubquery22MethodInfo
+            = typeof(IQueryBuffer).GetMethods().Where(m => m.Name == nameof(IQueryBuffer.CorrelateSubquery) && m.GetGenericArguments().Count() == 2).Single();
+
+        //private static readonly MethodInfo _correlateSubqueryAsyncMethodInfo
+        //    = typeof(IQueryBuffer).GetMethod(nameof(IQueryBuffer.CorrelateSubqueryAsync));
+
+        private static readonly MethodInfo _correlateSubqueryAsync22MethodInfo
+            = typeof(IQueryBuffer).GetMethods().Where(m => m.Name == nameof(IQueryBuffer.CorrelateSubqueryAsync) && m.GetGenericArguments().Count() == 2).Single();
 
         private static readonly MethodInfo _getCollectionAccessorMethodInfo
             = typeof(Metadata.Internal.NavigationExtensions).GetTypeInfo().GetDeclaredMethod(nameof(Metadata.Internal.NavigationExtensions.GetCollectionAccessor));
@@ -50,17 +57,21 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private List<Ordering> _parentOrderings { get; } = new List<Ordering>();
 
+        private bool _trackingQuery;
+
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         public CorrelatedCollectionOptimizingVisitor(
             [NotNull] EntityQueryModelVisitor queryModelVisitor,
-            [NotNull] QueryModel parentQueryModel)
+            [NotNull] QueryModel parentQueryModel,
+            bool trackingQuery)
         {
             _queryModelVisitor = queryModelVisitor;
             _queryCompilationContext = queryModelVisitor.QueryCompilationContext;
             _parentQueryModel = parentQueryModel;
+            _trackingQuery = trackingQuery;
         }
 
         /// <summary>
@@ -74,8 +85,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         ///     directly from your code. This API may change or be removed in future releases.
         /// </summary>
         public static bool IsCorrelatedCollectionMethod(MethodCallExpression methodCallExpression)
-            => methodCallExpression.Method.MethodIsClosedFormOf(_correlateSubqueryMethodInfo)
-               || methodCallExpression.Method.MethodIsClosedFormOf(_correlateSubqueryAsyncMethodInfo);
+            => methodCallExpression.Method.MethodIsClosedFormOf(_correlateSubquery22MethodInfo)
+               || methodCallExpression.Method.MethodIsClosedFormOf(_correlateSubqueryWithUserResultTypeMethodInfo)
+               || methodCallExpression.Method.MethodIsClosedFormOf(_correlateSubqueryAsync22MethodInfo);
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -123,45 +135,254 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private bool TryRewrite(SubQueryExpression subQueryExpression, bool forceToListResult, Type listResultElementType, out Expression result)
         {
-            if (_queryCompilationContext.TryGetCorrelatedSubqueryMetadata(subQueryExpression.QueryModel.MainFromClause, out var correlatedSubqueryMetadata)
-                && subQueryExpression.QueryModel.BodyClauses.OfType<WhereClause>()
-                    .Any(c => c.Predicate is NullSafeEqualExpression))
+            // find correlated subqueries that maybe can be optimized
+            if (subQueryExpression.QueryModel.BodyClauses.OfType<WhereClause>()
+                .Where(c => c.Predicate is NullSafeEqualExpression)
+                .SingleOrDefault()?.Predicate is NullSafeEqualExpression nullSafeEqualExpression
+                && CorrelatedSubqueryOptimizationValidator.CanTryOptimizeCorrelatedSubquery(subQueryExpression.QueryModel, (QuerySourceReferenceExpression)nullSafeEqualExpression.NavigationRootExpression))
             {
-                var parentQsre = new QuerySourceReferenceExpression(correlatedSubqueryMetadata.ParentQuerySource);
+                //var parentQsre = new QuerySourceReferenceExpression(correlatedSubqueryMetadata.ParentQuerySource);
                 result = Rewrite(
-                    correlatedSubqueryMetadata.Index,
+                    _queryCompilationContext.OptimizedCorrelatedCollectionCount++,
                     subQueryExpression.QueryModel,
-                    correlatedSubqueryMetadata.CollectionNavigation,
-                    correlatedSubqueryMetadata.TrackingQuery,
-                    parentQsre,
+                    //correlatedSubqueryMetadata.CollectionNavigation,
+                    _trackingQuery,
+                    //parentQsre,
                     forceToListResult,
                     listResultElementType);
 
                 return true;
             }
 
+
+
+
+
+            //if (CorrelatedSubqueryOptimizationValidator.CanTryOptimizeCorrelatedSubquery(subQueryExpression.QueryModel)
+            //    && subQueryExpression.QueryModel.BodyClauses.OfType<WhereClause>()
+            //        .Any(c => c.Predicate is NullSafeEqualExpression))
+            //{
+            //    //var parentQsre = new QuerySourceReferenceExpression(correlatedSubqueryMetadata.ParentQuerySource);
+            //    result = Rewrite(
+            //        _queryCompilationContext.OptimizedCorrelatedCollectionCount++,
+            //        subQueryExpression.QueryModel,
+            //        //correlatedSubqueryMetadata.CollectionNavigation,
+            //        _trackingQuery,
+            //        //parentQsre,
+            //        forceToListResult,
+            //        listResultElementType);
+
+            //    return true;
+            //}
+
             result = null;
 
             return false;
         }
 
+        private static class CorrelatedSubqueryOptimizationValidator
+        {
+            public static bool CanTryOptimizeCorrelatedSubquery(QueryModel queryModel, QuerySourceReferenceExpression navigationRootExpression)
+            {
+                if (queryModel.ResultOperators.Count > 0)
+                {
+                    return false;
+                }
+
+                if (navigationRootExpression.ReferencedQuerySource is MainFromClause mainFromClause
+                    && mainFromClause.FromExpression is QuerySourceReferenceExpression qsre
+                    && qsre.ReferencedQuerySource is GroupJoinClause)
+                {
+                    return false;
+                    //throw new InvalidOperationException("dupson");
+                }
+
+                //// expecting EntityQueryable here
+                //if (queryModel.MainFromClause.FromExpression is QuerySourceReferenceExpression)
+                //{
+                //    return false;
+                //}
+
+                //if (queryModel.MainFromClause.FromExpression is QuerySourceReferenceExpression qsre
+                //    && qsre.ReferencedQuerySource is GroupJoinClause)
+                //{
+                //    return false;
+                //}
+
+                //return true;
+
+                // first pass finds all the query sources defined in this scope (i.e. from clauses)
+                var definedQuerySourcesFinder = new DefinedQuerySourcesFindingVisitor();
+                definedQuerySourcesFinder.VisitQueryModel(queryModel);
+
+                // second pass makes sure that all qsres reference only query sources that were discovered in the first step, i.e. nothing from the outside
+                var qsreScopeValidator = new ReferencedQuerySourcesScopeValidatingVisitor(
+                    queryModel.MainFromClause, definedQuerySourcesFinder.QuerySources);
+
+                qsreScopeValidator.VisitQueryModel(queryModel);
+
+                return qsreScopeValidator.AllQuerySourceReferencesInScope;
+            }
+
+            private class DefinedQuerySourcesFindingVisitor : QueryModelVisitorBase
+            {
+                public ISet<IQuerySource> QuerySources { get; } = new HashSet<IQuerySource>();
+
+                public override void VisitQueryModel(QueryModel queryModel)
+                {
+                    queryModel.TransformExpressions(new TransformingQueryModelExpressionVisitor<DefinedQuerySourcesFindingVisitor>(this).Visit);
+
+                    base.VisitQueryModel(queryModel);
+                }
+
+                public override void VisitMainFromClause(MainFromClause fromClause, QueryModel queryModel)
+                {
+                    QuerySources.Add(fromClause);
+
+                    base.VisitMainFromClause(fromClause, queryModel);
+                }
+
+                public override void VisitAdditionalFromClause(AdditionalFromClause fromClause, QueryModel queryModel, int index)
+                {
+                    QuerySources.Add(fromClause);
+
+                    base.VisitAdditionalFromClause(fromClause, queryModel, index);
+                }
+
+                public override void VisitJoinClause(JoinClause joinClause, QueryModel queryModel, int index)
+                {
+                    QuerySources.Add(joinClause);
+
+                    base.VisitJoinClause(joinClause, queryModel, index);
+                }
+
+                public override void VisitGroupJoinClause(GroupJoinClause groupJoinClause, QueryModel queryModel, int index)
+                {
+                    QuerySources.Add(groupJoinClause);
+                    QuerySources.Add(groupJoinClause.JoinClause);
+
+                    base.VisitGroupJoinClause(groupJoinClause, queryModel, index);
+                }
+
+                public override void VisitWhereClause(WhereClause whereClause, QueryModel queryModel, int index)
+                {
+                    // don't check correlation predicate, we know it only contains qsres to itself and its direct parent
+                    if (whereClause.Predicate is NullSafeEqualExpression)
+                    {
+                        //var qsreFinder = new QuerySourceReferenceFindingExpressionVisitor();
+                        //qsreFinder.Visit(nullSafeEqualExpression.EqualExpression.Left);
+                        //QuerySources.Add(qsreFinder.QuerySourceReferenceExpression.ReferencedQuerySource);
+
+                        return;
+                    }
+
+                    base.VisitWhereClause(whereClause, queryModel, index);
+                }
+            }
+
+            private sealed class ReferencedQuerySourcesScopeValidatingVisitor : QueryModelVisitorBase
+            {
+                private class InnerVisitor : TransformingQueryModelExpressionVisitor<ReferencedQuerySourcesScopeValidatingVisitor>
+                {
+                    private readonly ISet<IQuerySource> _querySourcesInScope;
+
+                    public InnerVisitor(ISet<IQuerySource> querySourcesInScope, ReferencedQuerySourcesScopeValidatingVisitor transformingQueryModelVisitor)
+                        : base(transformingQueryModelVisitor)
+                    {
+                        _querySourcesInScope = querySourcesInScope;
+                    }
+
+                    public bool AllQuerySourceReferencesInScope { get; private set; } = true;
+
+                    protected override Expression VisitExtension(Expression extensionExpression)
+                    {
+                        // skip correlation predicate, we know it's correct because we created it and it stores qsre of the navigation root which we don't want to "discover" during validation process
+                        if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
+                        {
+                            return extensionExpression;
+                        }
+
+                        return base.VisitExtension(extensionExpression);
+                    }
+
+                    protected override Expression VisitQuerySourceReference(QuerySourceReferenceExpression expression)
+                    {
+                        if (!_querySourcesInScope.Contains(expression.ReferencedQuerySource))
+                        {
+                            AllQuerySourceReferencesInScope = false;
+                        }
+
+                        return base.VisitQuerySourceReference(expression);
+                    }
+                }
+
+                // query source that can reference something outside the scope, e.g. main from clause that contains the correlated navigation
+                private readonly IQuerySource _exemptQuerySource;
+                private readonly InnerVisitor _innerVisitor;
+
+                public ReferencedQuerySourcesScopeValidatingVisitor(IQuerySource exemptQuerySource, ISet<IQuerySource> querySourcesInScope)
+                {
+                    _exemptQuerySource = exemptQuerySource;
+                    _innerVisitor = new InnerVisitor(querySourcesInScope, this);
+                }
+
+                public bool AllQuerySourceReferencesInScope => _innerVisitor.AllQuerySourceReferencesInScope;
+
+                public override void VisitMainFromClause(MainFromClause fromClause, QueryModel queryModel)
+                {
+                    if (fromClause != _exemptQuerySource)
+                    {
+                        fromClause.TransformExpressions(_innerVisitor.Visit);
+                    }
+                }
+
+                protected override void VisitBodyClauses(ObservableCollection<IBodyClause> bodyClauses, QueryModel queryModel)
+                {
+                    foreach (var bodyClause in bodyClauses)
+                    {
+                        if (bodyClause != _exemptQuerySource)
+                        {
+                            bodyClause.TransformExpressions(_innerVisitor.Visit);
+                        }
+                    }
+                }
+
+                public override void VisitSelectClause(SelectClause selectClause, QueryModel queryModel)
+                {
+                    selectClause.TransformExpressions(_innerVisitor.Visit);
+                }
+
+                public override void VisitResultOperator(ResultOperatorBase resultOperator, QueryModel queryModel, int index)
+                {
+                    // it is not necessary to visit result ops at the moment, since we don't optimize subqueries that contain any result ops
+                    // however, we might support some result ops in the future
+                    resultOperator.TransformExpressions(_innerVisitor.Visit);
+                }
+            }
+        }
+
         private Expression Rewrite(
             int correlatedCollectionIndex,
             QueryModel collectionQueryModel,
-            INavigation navigation,
+            //INavigation navigation,
             bool trackingQuery,
-            QuerySourceReferenceExpression originQuerySource,
+            //QuerySourceReferenceExpression originQuerySource,
             bool forceListResult,
             Type listResultElementType)
         {
             var querySourceReferenceFindingExpressionTreeVisitor
                 = new QuerySourceReferenceFindingExpressionVisitor();
 
-            var originalCorrelationPredicate = collectionQueryModel.BodyClauses.OfType<WhereClause>()
+            var originalCorrelationPredicateBodyClause = collectionQueryModel.BodyClauses.OfType<WhereClause>()
                 .Single(c => c.Predicate is NullSafeEqualExpression);
-            collectionQueryModel.BodyClauses.Remove(originalCorrelationPredicate);
 
-            var keyEquality = ((NullSafeEqualExpression)originalCorrelationPredicate.Predicate).EqualExpression;
+            var originalCorrelationPredicate = (NullSafeEqualExpression)originalCorrelationPredicateBodyClause.Predicate;
+            var navigation = originalCorrelationPredicate.Navigations.Last();
+            var originQuerySource = originalCorrelationPredicate.NavigationRootExpression;
+
+            collectionQueryModel.BodyClauses.Remove(originalCorrelationPredicateBodyClause);
+
+            var keyEquality = originalCorrelationPredicate.EqualExpression;
             querySourceReferenceFindingExpressionTreeVisitor.Visit(keyEquality.Left);
             var parentQuerySourceReferenceExpression = querySourceReferenceFindingExpressionTreeVisitor.QuerySourceReferenceExpression;
 
@@ -198,7 +419,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var originEntityType = _queryCompilationContext.Model.FindEntityType(originQuerySource.Type);
             foreach (var property in originEntityType.FindPrimaryKey().Properties)
             {
-                TryAddPropertyToOrderings(property, originQuerySource, parentOrderings);
+                TryAddPropertyToOrderings(property, (QuerySourceReferenceExpression)originQuerySource, parentOrderings);
             }
 
             foreach (var property in navigation.ForeignKey.PrincipalKey.Properties)
@@ -322,8 +543,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var navigationParameter = Expression.Parameter(typeof(INavigation), "n");
 
             var correlateSubqueryMethod = _queryCompilationContext.IsAsyncQuery
-                ? _correlateSubqueryAsyncMethodInfo
-                : _correlateSubqueryMethodInfo;
+                ? _correlateSubqueryAsync22MethodInfo
+                : _correlateSubquery22MethodInfo;
 
             Expression resultCollectionFactoryExpressionBody;
             if (forceListResult
@@ -333,10 +554,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 var resultCollectionType = typeof(List<>).MakeGenericType(listResultElementType);
                 var resultCollectionCtor = resultCollectionType.GetTypeInfo().GetDeclaredConstructor(Array.Empty<Type>());
 
+                //correlateSubqueryMethod = correlateSubqueryMethod.MakeGenericMethod(
+                //    collectionQueryModelSelectorType,
+                //    listResultElementType,
+                //    typeof(List<>).MakeGenericType(listResultElementType));
                 correlateSubqueryMethod = correlateSubqueryMethod.MakeGenericMethod(
                     collectionQueryModelSelectorType,
-                    listResultElementType,
-                    typeof(List<>).MakeGenericType(listResultElementType));
+                    listResultElementType);
 
                 resultCollectionFactoryExpressionBody = Expression.New(resultCollectionCtor);
 
@@ -344,10 +568,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             }
             else
             {
+                //correlateSubqueryMethod = correlateSubqueryMethod.MakeGenericMethod(
+                //    collectionQueryModelSelectorType,
+                //    collectionQueryModelSelectorType,
+                //    navigation.GetCollectionAccessor().CollectionType);
                 correlateSubqueryMethod = correlateSubqueryMethod.MakeGenericMethod(
                     collectionQueryModelSelectorType,
-                    collectionQueryModelSelectorType,
-                    navigation.GetCollectionAccessor().CollectionType);
+                    collectionQueryModelSelectorType);
 
                 resultCollectionFactoryExpressionBody
                     = Expression.Convert(
@@ -394,7 +621,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             {
                 Expression.Constant(correlatedCollectionIndex),
                 Expression.Constant(navigation),
-                resultCollectionFactoryExpression,
+                //resultCollectionFactoryExpression,
                 outerKey,
                 Expression.Constant(trackingQuery),
                 lambda,
