@@ -29,6 +29,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             _sourceParameter = sourceParameter;
         }
 
+        protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
+        {
+            var newBody = Visit(lambdaExpression.Body);
+
+            return newBody != lambdaExpression.Body
+                ? Expression.Lambda(newBody, lambdaExpression.Parameters)
+                : lambdaExpression;
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
         {
             // don't touch Include

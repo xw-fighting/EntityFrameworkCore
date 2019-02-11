@@ -107,11 +107,20 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var newExpression = navigationExpandingExpressionVisitor.Visit(expression);
             newExpression = new ReducingVisitor().Visit(newExpression);
 
-            return newExpression;
+            // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
+            return newExpression.RemoveConvert();
         }
 
         private class ReducingVisitor : ExpressionVisitor
         {
+            //protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
+            //{
+            //    var newBody = Visit(lambdaExpression.Body);
+
+            //    return newBody != lambdaExpression.Body
+            //        ? Expression.Lambda(newBody, lambdaExpression.Parameters)
+            //        : lambdaExpression;
+            //}
         }
     }
 

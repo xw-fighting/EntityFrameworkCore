@@ -573,7 +573,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType))
                     {
-                        source = methodCallExpression.Update(methodCallExpression.Object, new[] { result });
+                        var newMethod = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                            result.Type.GetGenericArguments()[0]);
+
+                        source = Expression.Call(newMethod, new[] { result });
+                        //source = methodCallExpression.Update(methodCallExpression.Object, new[] { result });
                     }
                     else if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableContains))

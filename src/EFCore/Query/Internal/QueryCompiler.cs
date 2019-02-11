@@ -144,8 +144,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                         var result = memberExpression.Expression;
                         while (extractionPath.Count > 0)
                         {
-                            var extractionPathElement = extractionPath.Pop();
-
                             // HACK: sometimes QM will access Inner/Outer property of the QSRE that is itself a transparent identifier - we should just allow that
                             if (!(result is NewExpression))
                             {
@@ -154,7 +152,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                                     return memberExpression;
                                 }
 
-                                var expr = Expression.Field(result, extractionPathElement);
+                                var expr = Expression.Field(result, extractionPath.Pop());
                                 while (extractionPath.Count > 0)
                                 {
                                     expr = Expression.Field(expr, extractionPath.Pop());
@@ -164,6 +162,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
                                 //return memberExpression;
                             }
+
+                            var extractionPathElement = extractionPath.Pop();
 
                             var newExpression = (NewExpression)result;
 

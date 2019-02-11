@@ -62,7 +62,8 @@ WHERE [l.OneToOne_Required_FK1].[Id] > 7");
             AssertSql(
                 @"SELECT [l].[Id], [l].[Date], [l].[Level1_Optional_Id], [l].[Level1_Required_Id], [l].[Name], [l].[OneToMany_Optional_Inverse2Id], [l].[OneToMany_Optional_Self_Inverse2Id], [l].[OneToMany_Required_Inverse2Id], [l].[OneToMany_Required_Self_Inverse2Id], [l].[OneToOne_Optional_PK_Inverse2Id], [l].[OneToOne_Optional_Self2Id]
 FROM [LevelTwo] AS [l]
-WHERE [l].[Level1_Required_Id] > 7");
+INNER JOIN [LevelOne] AS [l.OneToOne_Required_FK_Inverse2] ON [l].[Level1_Required_Id] = [l.OneToOne_Required_FK_Inverse2].[Id]
+WHERE [l.OneToOne_Required_FK_Inverse2].[Id] > 7");
         }
 
         public override async Task Key_equality_using_property_method_nested(bool isAsync)
@@ -895,7 +896,8 @@ WHERE [l11].[Id] = [l12].[Id]");
                 @"SELECT [l1].[Id] AS [Id1], [l2].[Id] AS [Id2]
 FROM [LevelOne] AS [l1]
 CROSS JOIN [LevelTwo] AS [l2]
-WHERE [l1].[Id] = [l2].[Level1_Optional_Id]");
+LEFT JOIN [LevelOne] AS [ti.OneToOne_Optional_FK_Inverse2] ON [l2].[Level1_Optional_Id] = [ti.OneToOne_Optional_FK_Inverse2].[Id]
+WHERE [l1].[Id] = [ti.OneToOne_Optional_FK_Inverse2].[Id]");
         }
 
         public override async Task SelectMany_navigation_comparison3(bool isAsync)
@@ -3196,12 +3198,12 @@ WHERE EXISTS (
             AssertSql(
                 @"SELECT [l2].[Name]
 FROM [LevelTwo] AS [l2]
-LEFT JOIN [LevelThree] AS [l2.OneToOne_Optional_PK2] ON [l2].[Id] = [l2.OneToOne_Optional_PK2].[OneToOne_Optional_PK_Inverse3Id]
 LEFT JOIN [LevelThree] AS [l2.OneToOne_Required_FK2] ON [l2].[Id] = [l2.OneToOne_Required_FK2].[Level2_Required_Id]
+LEFT JOIN [LevelThree] AS [l2.OneToOne_Required_FK2.OneToOne_Optional_PK2] ON [l2].[Id] = [l2.OneToOne_Required_FK2.OneToOne_Optional_PK2].[OneToOne_Optional_PK_Inverse3Id]
 WHERE EXISTS (
     SELECT 1
-    FROM [LevelFour] AS [i]
-    WHERE [l2.OneToOne_Required_FK2].[Id] = [i].[OneToMany_Optional_Inverse4Id])");
+    FROM [LevelFour] AS [l]
+    WHERE [l2.OneToOne_Required_FK2].[Id] = [l].[OneToMany_Optional_Inverse4Id])");
         }
 
         public override async Task Level4_Include(bool isAsync)

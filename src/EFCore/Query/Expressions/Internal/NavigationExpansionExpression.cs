@@ -49,6 +49,12 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             if (State.FinalProjectionPath.Count == 0
                 && (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0]))
             {
+                // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
+                if (Operand.Type != _returnType)
+                {
+                    return Expression.Convert(Operand, _returnType);
+                }
+
                 return Operand;
             }
 
