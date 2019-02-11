@@ -382,7 +382,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     {
                         PendingSelector = lambda,
                         CurrentParameter = transparentIdentifierParameter,
-                        FinalProjectionPath = new List<string>(),
+                        //FinalProjectionPath = new List<string>(),
                         SourceMappings = outerState.SourceMappings.Concat(collectionSelectorNavigationExpansionExpression.State.SourceMappings).ToList()
                     };
 
@@ -740,7 +740,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 CurrentParameter = result.parameter,
                 SourceMappings = state.SourceMappings,
-                FinalProjectionPath = state.FinalProjectionPath,
+                //FinalProjectionPath = state.FinalProjectionPath,
                 PendingSelector = result.pendingSelector,
             };
 
@@ -1027,7 +1027,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 PendingSelector = pendingSelector,
                 CurrentParameter = transparentIdentifierParameter,
-                FinalProjectionPath = new List<string>(),
+                //FinalProjectionPath = new List<string>(),
                 SourceMappings = outerState.SourceMappings.Concat(innerState.SourceMappings).ToList()
             };
 

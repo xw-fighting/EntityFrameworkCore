@@ -113,14 +113,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         private class ReducingVisitor : ExpressionVisitor
         {
-            //protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
-            //{
-            //    var newBody = Visit(lambdaExpression.Body);
-
-            //    return newBody != lambdaExpression.Body
-            //        ? Expression.Lambda(newBody, lambdaExpression.Parameters)
-            //        : lambdaExpression;
-            //}
         }
     }
 

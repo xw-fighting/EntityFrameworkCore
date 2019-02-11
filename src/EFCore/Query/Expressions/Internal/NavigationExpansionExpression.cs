@@ -28,7 +28,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public ParameterExpression CurrentParameter { get; set; }
         public List<SourceMapping> SourceMappings { get; set; } = new List<SourceMapping>();
         public LambdaExpression PendingSelector { get; set; }
-        public List<string> FinalProjectionPath { get; set; } = new List<string>();
+        //public List<string> FinalProjectionPath { get; set; } = new List<string>();
     }
 
     public class NavigationExpansionExpression : Expression, IPrintable
@@ -46,8 +46,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public override bool CanReduce => true;
         public override Expression Reduce()
         {
-            if (State.FinalProjectionPath.Count == 0
-                && (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0]))
+            if (/*State.FinalProjectionPath.Count == 0
+                &&*/ (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0]))
             {
                 // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
                 if (Operand.Type != _returnType)
