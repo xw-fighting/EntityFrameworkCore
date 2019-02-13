@@ -41,76 +41,112 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
         protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
         {
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableWhereMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(EnumerableWhereMethodInfo))
+            switch (methodCallExpression.Method.Name)
             {
-                var result = ProcessWhere(methodCallExpression);
+                case nameof(Queryable.Where):
+                    return ProcessWhere(methodCallExpression);
 
-                return result;
+                case nameof(Queryable.Select):
+                    return ProcessSelect(methodCallExpression);
+
+                case nameof(Queryable.OrderBy):
+                case nameof(Queryable.OrderByDescending):
+                case nameof(Queryable.ThenBy):
+                case nameof(Queryable.ThenByDescending):
+                    return ProcessOrderBy(methodCallExpression);
+
+                case nameof(Queryable.Distinct):
+                case nameof(Queryable.Take):
+                case nameof(Queryable.First):
+                case nameof(Queryable.FirstOrDefault):
+                case nameof(Queryable.Single):
+                case nameof(Queryable.SingleOrDefault):
+                case nameof(Queryable.Any):
+                case nameof(Queryable.Contains):
+                //case nameof(Queryable.DefaultIfEmpty):
+                    return ProcessTerminatingOperation(methodCallExpression);
+
+                case nameof(Queryable.Join):
+                    return ProcessJoin(methodCallExpression);
+
+                default:
+                    if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
+                    {
+                        var result = ProcessSelectManyWithResultOperator(methodCallExpression);
+
+                        return result;
+                    }
+
+                    return base.VisitMethodCall(methodCallExpression);
             }
 
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectMethodInfo))
-            {
-                var result = ProcessSelect(methodCallExpression);
 
-                return result;
-            }
 
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableOrderByMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOrderByDescendingMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableThenByMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableThenByDescendingMethodInfo))
-            {
-                var result = ProcessOrderBy(methodCallExpression);
 
-                return result;
-            }
-
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
-            {
-                var result = ProcessSelectManyWithResultOperator(methodCallExpression);
-
-                return result;
-            }
-
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableJoinMethodInfo))
-            {
-                var result = ProcessJoin(methodCallExpression);
-
-                return result;
-            }
-
-            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableGroupJoinMethodInfo))
+            //        if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableWhereMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(EnumerableWhereMethodInfo))
             //{
-            //    var result = ProcessGroupJoin(methodCallExpression);
+            //    var result = ProcessWhere(methodCallExpression);
 
             //    return result;
             //}
 
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstOrDefaultMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleOrDefaultMethodInfo)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableAny)
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableContains)
-
-                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType))
-            {
-                var result = ProcessTerminatingOperation(methodCallExpression);
-
-                return result;
-            }
-
-            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType))
+            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(EnumerableSelectMethodInfo))
             //{
-            //    var result = ProcessOfType(methodCallExpression);
+            //    var result = ProcessSelect(methodCallExpression);
 
             //    return result;
             //}
 
-            return base.VisitMethodCall(methodCallExpression);
+            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableOrderByMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOrderByDescendingMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableThenByMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableThenByDescendingMethodInfo))
+            //{
+            //    var result = ProcessOrderBy(methodCallExpression);
+
+            //    return result;
+            //}
+
+            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
+            //{
+            //    var result = ProcessSelectManyWithResultOperator(methodCallExpression);
+
+            //    return result;
+            //}
+
+            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableJoinMethodInfo))
+            //{
+            //    var result = ProcessJoin(methodCallExpression);
+
+            //    return result;
+            //}
+
+            ////if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableGroupJoinMethodInfo))
+            ////{
+            ////    var result = ProcessGroupJoin(methodCallExpression);
+
+            ////    return result;
+            ////}
+
+            //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstOrDefaultMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleOrDefaultMethodInfo)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableAny)
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableContains)
+
+            //    || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType))
+            //{
+            //    var result = ProcessTerminatingOperation(methodCallExpression);
+
+            //    return result;
+            //}
+
+            //return base.VisitMethodCall(methodCallExpression);
         }
 
         private NavigationExpansionExpressionState AdjustState(NavigationExpansionExpressionState state, NavigationExpansionExpression navigationExpansionExpression)

@@ -76,9 +76,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         {
             var result = source;
 
-            var fullPath = initialPath != null
-                ? initialPath.Concat(accessorPath).ToList()
-                : accessorPath;
+            var fullPath = accessorPath;// initialPath != null
+                //? initialPath.Concat(accessorPath).ToList()
+                //: accessorPath;
 
             if (fullPath != null)
             {

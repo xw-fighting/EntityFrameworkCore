@@ -885,6 +885,8 @@ namespace Microsoft.EntityFrameworkCore.Query
         [MemberData(nameof(IsAsyncData))]
         public virtual Task Join_navigation_translated_to_subquery_nested(bool isAsync)
         {
+            and this one!!!
+
             return AssertQuery<Level1, Level3>(
                 isAsync,
                 (l1s, l3s) =>
@@ -2495,6 +2497,9 @@ namespace Microsoft.EntityFrameworkCore.Query
         [MemberData(nameof(IsAsyncData))]
         public virtual Task Order_by_key_of_anonymous_type_projected_navigation_doesnt_get_optimized_into_FK_access_subquery(bool isAsync)
         {
+            this one!!!!
+
+
             return AssertQuery<Level3>(
                 isAsync,
                 l3s => l3s
