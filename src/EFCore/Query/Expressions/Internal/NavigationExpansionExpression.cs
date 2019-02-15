@@ -68,7 +68,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public List<SourceMapping> SourceMappings { get; set; } = new List<SourceMapping>();
         public List<SourceMapping2> SourceMappings2 { get; set; } = new List<SourceMapping2>();
         public LambdaExpression PendingSelector { get; set; }
-        //public List<string> FinalProjectionPath { get; set; } = new List<string>();
+        public LambdaExpression PendingSelector2 { get; set; }
     }
 
     public class NavigationExpansionExpression : Expression, IPrintable

@@ -64,7 +64,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 case nameof(Queryable.Any):
                 case nameof(Queryable.Contains):
                 //case nameof(Queryable.DefaultIfEmpty):
-                    return ProcessTerminatingOperation(methodCallExpression);
+                    return ProcessTerminatingOperation2(methodCallExpression);
 
                 case nameof(Queryable.Join):
                     return ProcessJoin(methodCallExpression);
@@ -156,6 +156,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             state.CurrentParameter = state.CurrentParameter ?? currentParameter;
             //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             state.PendingSelector = state.PendingSelector ?? Expression.Lambda(state.CurrentParameter, state.CurrentParameter);
+            state.PendingSelector2 = state.PendingSelector2 ?? Expression.Lambda(currentParameter, currentParameter);
 
             return state;
         }
@@ -228,16 +229,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 source = navigationExpansionExpression.Operand;
                 state = AdjustState(state, navigationExpansionExpression);
-
-                //// TODO: fix this!
-                //var currentParameter = state.CurrentParameter;
-                //state = navigationExpansionExpression.State;
-                //state.CurrentParameter = state.CurrentParameter ?? currentParameter;
-                //state.PendingSelector = state.PendingSelector ?? Expression.Lambda(currentParameter, currentParameter);
             }
 
-            var combinedSelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, selector.UnwrapQuote());
-            combinedSelector = (LambdaExpression)Visit(combinedSelector);
+            //var combinedSelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, selector.UnwrapQuote());
+            //combinedSelector = (LambdaExpression)Visit(combinedSelector);
 
             //var binder = new NavigationPropertyBindingExpressionVisitor(
             //    state.CurrentParameter,
@@ -246,7 +241,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             //var boundSelector = binder.Visit(combinedSelector);
 
             var binder2 = new NavigationPropertyBindingExpressionVisitor2(
-                selectorParameter,// state.CurrentParameter,
+                selectorParameter,
                 state.SourceMappings2);
 
             var boundSelector2 = binder2.Visit(selector);
@@ -254,7 +249,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             //var cnrev = new CollectionNavigationRewritingExpressionVisitor2(state.CurrentParameter);
             //combinedSelector = (LambdaExpression)cnrev.Visit(boundSelector);
 
-            var result = FindAndApplyNavigations(source, combinedSelector, state);
+            var result = FindAndApplyNavigations(source, selector/*combinedSelector*/, state);
             result.state.PendingSelector = result.lambda;
 
             var selectorRemapper = new FoundNavigationSelectorRemapper(selectorParameter);
@@ -281,10 +276,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 state = AdjustState(state, navigationExpansionExpression);
             }
 
-            var combinedKeySelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, keySelector.UnwrapQuote());
-            combinedKeySelector = (LambdaExpression)Visit(combinedKeySelector);
+            //var combinedKeySelector = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, keySelector.UnwrapQuote());
+            //combinedKeySelector = (LambdaExpression)Visit(combinedKeySelector);
 
-            var result = FindAndApplyNavigations(source, combinedKeySelector, state);
+            //var result = FindAndApplyNavigations(source, combinedKeySelector, state);
+            var result = FindAndApplyNavigations(source, keySelector, state);
 
             var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(result.state.CurrentParameter.Type, result.lambda.UnwrapQuote().Body.Type);
             var rewritten = Expression.Call(newMethodInfo, result.source, result.lambda);
@@ -569,6 +565,37 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             return methodCallExpression;
         }
 
+        private Expression ProcessTerminatingOperation2(MethodCallExpression methodCallExpression)
+        {
+            var source = Visit(methodCallExpression.Arguments[0]);
+            var state = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = Expression.Parameter(source.Type.GetGenericArguments()[0], source.Type.GetGenericArguments()[0].GenerateParameterName())
+            };
+
+            if (source is NavigationExpansionExpression navigationExpansionExpression)
+            {
+                source = navigationExpansionExpression.Operand;
+                var currentParameter = state.CurrentParameter;
+                state = navigationExpansionExpression.State;
+                state.CurrentParameter = state.CurrentParameter ?? currentParameter;
+
+                if (state.PendingSelector != null)
+                {
+                    var pendingSelectorParameter = state.PendingSelector.Parameters[0];
+
+                    var binder = new NavigationPropertyBindingExpressionVisitor2(
+                        pendingSelectorParameter,
+                        state.SourceMappings2);
+
+                    var boundSelector = binder.Visit(state.PendingSelector);
+                }
+            }
+
+            // we should never hit this
+            return methodCallExpression;
+        }
+
         private Expression ProcessTerminatingOperation(MethodCallExpression methodCallExpression)
         {
             var source = Visit(methodCallExpression.Arguments[0]);
@@ -811,6 +838,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 SourceMappings2 = state.SourceMappings2,
                 PendingSelector = result.pendingSelector,
             };
+
+            // TODO: improve this (maybe a helper method?)
+            if (source.Type.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>)
+                && result.source.Type.GetGenericTypeDefinition() == typeof(IQueryable<>))
+            {
+                var toOrderedMethod = typeof(NavigationExpansionExpression).GetMethod(nameof(NavigationExpansionExpression.ToOrdered)).MakeGenericMethod(result.source.Type.GetGenericArguments()[0]);
+                var toOrderedCall = Expression.Call(toOrderedMethod, result.source);
+
+                return (source: toOrderedCall, lambda: newLambda2, state: newState);
+            }
 
             return (result.source, lambda: newLambda2, state: newState);
         }
@@ -1590,7 +1627,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
             private void GenerateNewMapping(NavigationTreeNode2 navigationTreeNode, List<string> currentMappingFragment, List<string> newMappingFragment)
             {
-                var match = navigationTreeNode.FromMappings.Where(m => m.Count >= currentMappingFragment.Count && m.SequenceEqual(currentMappingFragment.Take(m.Count))).Single();
+                var match = navigationTreeNode.FromMappings.Where(m => m.Count >= currentMappingFragment.Count && m.Take(currentMappingFragment.Count).SequenceEqual(currentMappingFragment)).Single();
                 var newMapping = match.ToList();
 
                 newMapping.RemoveRange(0, currentMappingFragment.Count);

@@ -5612,6 +5612,34 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         [ConditionalFact]
+        public virtual void Nav3_1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Foo")
+                    .Select(l1 => new { foo = l1 })
+                    .OrderBy(x => x.foo.OneToOne_Optional_PK1.Name);
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav3_2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Where(l1 => l1.OneToOne_Optional_PK1.Name != "Foo")
+                    .Select(l1 => new { foo = l1, bar = l1, baz = l1.OneToOne_Optional_PK1 })
+                    .OrderBy(x => x.foo.OneToOne_Optional_PK1.Name).ThenBy(x => x.bar.OneToOne_Optional_FK1).ThenBy(x => x.baz);
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
         public virtual void Nav4()
         {
             using (var ctx = CreateContext())

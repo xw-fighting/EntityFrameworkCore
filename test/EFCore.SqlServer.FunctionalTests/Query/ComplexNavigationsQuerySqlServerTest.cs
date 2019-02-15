@@ -4089,6 +4089,26 @@ LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_PK1] ON [l1].[Id] = [l1.OneToOne_O
 WHERE ([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK1].[Name] IS NULL");
         }
 
+        public override void Nav3_1()
+        {
+            base.Nav3_1();
+
+            AssertSql(
+                @"SELECT [l1].[Id], [l1].[Date], [l1].[Name], [l1].[OneToMany_Optional_Self_Inverse1Id], [l1].[OneToMany_Required_Self_Inverse1Id], [l1].[OneToOne_Optional_Self1Id]
+FROM [LevelOne] AS [l1]
+LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_PK1] ON [l1].[Id] = [l1.OneToOne_Optional_PK1].[OneToOne_Optional_PK_Inverse2Id]
+WHERE ([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK1].[Name] IS NULL
+ORDER BY [l1.OneToOne_Optional_PK1].[Name]");
+        }
+
+        public override void Nav3_2()
+        {
+            base.Nav3_2();
+
+            AssertSql(
+                @"");
+        }
+
         public override void Nav4()
         {
             base.Nav4();
@@ -4116,7 +4136,6 @@ WHERE ([l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2].[Name] <> N'Foo') OR [l1
             AssertSql(
                 @"");
         }
-
 
         public override void Nav6()
         {
