@@ -4055,6 +4055,14 @@ ORDER BY [t0].[Id]");
                 @"");
         }
 
+        public override void Nav1_1()
+        {
+            base.Nav1_1();
+
+            AssertSql(
+                @"");
+        }
+
         public override void Nav2()
         {
             base.Nav2();

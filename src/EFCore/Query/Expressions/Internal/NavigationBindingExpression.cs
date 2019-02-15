@@ -7,6 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
@@ -46,6 +47,46 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             expressionPrinter.Visit(RootParameter);
             expressionPrinter.StringBuilder.Append(" | ");
             expressionPrinter.StringBuilder.Append(string.Join(", ", Navigations.Select(n => n.Name)) + ")");
+        }
+    }
+
+    public class NavigationBindingExpression2 : Expression, IPrintable
+    {
+        public Expression Operand { get; }
+        public ParameterExpression RootParameter { get; }
+        public IEntityType EntityType { get; }
+        public NavigationTreeNode2 NavigationTreeNode { get; }
+        public SourceMapping2 SourceMapping { get; }
+
+        public override ExpressionType NodeType => ExpressionType.Extension;
+        public override bool CanReduce => true;
+        public override Type Type => Operand.Type;
+
+        public override Expression Reduce()
+            => Operand;
+
+        public NavigationBindingExpression2(
+            Expression operand,
+            ParameterExpression rootParameter,
+            NavigationTreeNode2 navigationTreeNode,
+            IEntityType entityType,
+            SourceMapping2 sourceMapping)
+        {
+            Operand = operand;
+            RootParameter = rootParameter;
+            NavigationTreeNode = navigationTreeNode;
+            EntityType = entityType;
+            SourceMapping = sourceMapping;
+        }
+
+        public void Print([NotNull] ExpressionPrinter expressionPrinter)
+        {
+            expressionPrinter.StringBuilder.Append("BINDING(");
+            expressionPrinter.Visit(RootParameter);
+            expressionPrinter.StringBuilder.Append(" | ");
+
+            // TODO: fix this
+            expressionPrinter.StringBuilder.Append(string.Join(", ", NavigationTreeNode.FromMappings.First()) + ")");
         }
     }
 }

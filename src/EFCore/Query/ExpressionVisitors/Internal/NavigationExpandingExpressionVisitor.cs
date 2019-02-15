@@ -122,6 +122,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public bool Optional { get; set; }
         public NavigationTreeNode Parent { get; set; }
         public List<NavigationTreeNode> Children { get; set; }
+        public bool Expanded { get; set; }
+
+        //public List<List<string>> FromMappings { get; set; }
+        //public List<string> ToMapping { get; set; }
 
         public List<string> GeneratePath()
         {
@@ -152,6 +156,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 Navigation = navigation,
                 Optional = optional,
                 Children = new List<NavigationTreeNode>(),
+                //FromMappings = new List<List<string>>() { new List<string>() },
+                //ToMapping = new List<string>(),
+                Expanded = false,
             };
 
             var child = Create(expansionPath.Skip(1), optional);
@@ -176,6 +183,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         public bool TryCombine(NavigationTreeNode other)
         {
+            // TODO: combine "Expanded" nodes also? if either NavigationTreeNode is expanded, the result should be as well
             if (other.Navigation != Navigation)
             {
                 return false;
@@ -200,6 +208,99 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             }
 
             return true;
+        }
+    }
+
+    public class NavigationTreeNode2
+    {
+        private NavigationTreeNode2(
+            INavigation navigation,
+            bool optional,
+            NavigationTreeNode2 parent)
+        {
+            Navigation = navigation;
+            Optional = optional;
+            Parent = parent;
+
+            if (parent != null)
+            {
+                foreach (var parentFromMapping in parent.FromMappings)
+                {
+                    var newMapping = parentFromMapping.ToList();
+                    newMapping.Add(navigation.Name);
+                    FromMappings.Add(newMapping);
+                }
+            }
+            else
+            {
+                FromMappings.Add(new List<string> { navigation.Name });
+            }
+        }
+
+        public INavigation Navigation { get; private set; }
+        public bool Optional { get; private set; }
+        public NavigationTreeNode2 Parent { get; private set; }
+        public List<NavigationTreeNode2> Children { get; private set; } = new List<NavigationTreeNode2>();
+        public bool Expanded { get; set; }
+
+        public List<List<string>> FromMappings { get; set; } = new List<List<string>>();
+        public List<string> ToMapping { get; set; } = new List<string>();
+
+        public static NavigationTreeNode2 Create(
+            SourceMapping2 sourceMapping,
+            INavigation navigation,
+            NavigationTreeNode2 parent)
+        {
+            if (parent != null)
+            {
+                var existingChild = parent.Children.Where(c => c.Navigation == navigation).SingleOrDefault();
+
+                if (existingChild != null)
+                {
+                    return existingChild;
+                }
+            }
+
+            var existingTopLevel = sourceMapping.FoundNavigations.Where(n => n.Navigation == navigation).SingleOrDefault();
+            if (existingTopLevel != null)
+            {
+                return existingTopLevel;
+            }
+
+            // if (any) parent is optional, all children must be optional also
+            var optional = parent?.Optional ?? false;
+
+            // TODO: what about query filters?
+            optional = optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
+
+            var result = new NavigationTreeNode2(navigation, optional, parent);
+
+            if (parent != null)
+            {
+                parent.Children.Add(result);
+            }
+            else
+            {
+                sourceMapping.FoundNavigations.Add(result);
+            }
+
+            return result;
+        }
+
+        // TODO: get rid of it?
+        public List<string> GeneratePath()
+        {
+            if (Parent == null)
+            {
+                return new List<string> { Navigation.Name };
+            }
+            else
+            {
+                var result = Parent.GeneratePath();
+                result.Add(Navigation.Name);
+
+                return result;
+            }
         }
     }
 }
