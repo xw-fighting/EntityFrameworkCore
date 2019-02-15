@@ -30,35 +30,36 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
     public class SourceMapping2
     {
         public IEntityType RootEntityType { get; set; }
-        public List<NavigationTreeNode2> FoundNavigations { get; set; } = new List<NavigationTreeNode2>();
-        //public NavigationTreeNode2 NavigationTreeRoot { get; set; }
-        public List<List<string>> RootFromMappings { get; set; } = new List<List<string>>() { new List<string>() };
-        public List<string> RootToMapping { get; set; } = new List<string>();
+
+        public NavigationTreeNode2 NavigationTree { get; set; }
+        //public List<NavigationTreeNode2> FoundNavigations { get; set; } = new List<NavigationTreeNode2>();
+        //public List<List<string>> RootFromMappings { get; set; } = new List<List<string>>() { new List<string>() };
+        //public List<string> RootToMapping { get; set; } = new List<string>();
 
         // TODO: fix this
-        public List<NavigationTreeNode2> FlattenNavigations()
-        {
-            var result = new List<NavigationTreeNode2>();
-            foreach (var navigationTreeNode in FoundNavigations)
-            {
-                result.AddRange(GetChildren(navigationTreeNode));
-            }
+        //public List<NavigationTreeNode2> FlattenNavigations()
+        //{
+        //    var result = new List<NavigationTreeNode2>();
+        //    foreach (var navigationTreeNode in FoundNavigations)
+        //    {
+        //        result.AddRange(GetChildren(navigationTreeNode));
+        //    }
 
-            return result;
-        }
+        //    return result;
+        //}
 
-        private List<NavigationTreeNode2> GetChildren(NavigationTreeNode2 navigationTreeNode)
-        {
-            var result = new List<NavigationTreeNode2>();
-            result.Add(navigationTreeNode);
+        //private List<NavigationTreeNode2> GetChildren(NavigationTreeNode2 navigationTreeNode)
+        //{
+        //    var result = new List<NavigationTreeNode2>();
+        //    result.Add(navigationTreeNode);
 
-            foreach (var child in navigationTreeNode.Children)
-            {
-                result.AddRange(GetChildren(child));
-            }
+        //    foreach (var child in navigationTreeNode.Children)
+        //    {
+        //        result.AddRange(GetChildren(child));
+        //    }
 
-            return result;
-        }
+        //    return result;
+        //}
     }
 
     public class NavigationExpansionExpressionState

@@ -233,7 +233,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             }
             else
             {
-                FromMappings.Add(new List<string> { navigation.Name });
+                // root
+                FromMappings.Add(new List<string>());
+                ToMapping = new List<string>();
+                Expanded = true;
             }
         }
 
@@ -244,34 +247,28 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public bool Expanded { get; set; }
 
         public List<List<string>> FromMappings { get; set; } = new List<List<string>>();
-        public List<string> ToMapping { get; set; } = new List<string>();
+        public List<string> ToMapping { get; set; }// = new List<string>();
 
         public static NavigationTreeNode2 Create(
             SourceMapping2 sourceMapping,
             INavigation navigation,
             NavigationTreeNode2 parent)
         {
-            if (parent != null)
+            // navigation = null means root, represented as top level node in the NavigationTree
+            if (navigation == null)
             {
-                var existingChild = parent.Children.Where(c => c.Navigation == navigation).SingleOrDefault();
-
-                if (existingChild != null)
-                {
-                    return existingChild;
-                }
+                return sourceMapping.NavigationTree ?? new NavigationTreeNode2(null, false, null);
             }
 
-            var existingTopLevel = sourceMapping.FoundNavigations.Where(n => n.Navigation == navigation).SingleOrDefault();
-            if (existingTopLevel != null)
+            var existingChild = parent.Children.Where(c => c.Navigation == navigation).SingleOrDefault();
+            if (existingChild != null)
             {
-                return existingTopLevel;
+                return existingChild;
             }
 
             // if (any) parent is optional, all children must be optional also
-            var optional = parent?.Optional ?? false;
-
             // TODO: what about query filters?
-            optional = optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
+            var optional = parent.Optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
 
             var result = new NavigationTreeNode2(navigation, optional, parent);
 
@@ -279,9 +276,18 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             {
                 parent.Children.Add(result);
             }
-            else
+
+            return result;
+        }
+
+        public List<NavigationTreeNode2> Flatten()
+        {
+            var result = new List<NavigationTreeNode2>();
+            result.Add(this);
+
+            foreach (var child in Children)
             {
-                sourceMapping.FoundNavigations.Add(result);
+                result.AddRange(child.Flatten());
             }
 
             return result;

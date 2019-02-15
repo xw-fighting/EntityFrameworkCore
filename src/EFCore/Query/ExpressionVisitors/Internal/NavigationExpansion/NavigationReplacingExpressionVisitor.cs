@@ -167,7 +167,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 if (navigationBindingExpression.RootParameter == _previousParameter)
                 {
-                    var path = navigationBindingExpression.NavigationTreeNode?.ToMapping ?? navigationBindingExpression.SourceMapping.RootToMapping;
+                    var path = navigationBindingExpression.NavigationTreeNode.ToMapping;
                     var result = BuildAccessorExpression(_newParameter, path);
 
                     return result;

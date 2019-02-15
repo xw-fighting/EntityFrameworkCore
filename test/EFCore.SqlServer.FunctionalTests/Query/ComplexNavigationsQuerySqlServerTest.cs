@@ -4060,7 +4060,10 @@ ORDER BY [t0].[Id]");
             base.Nav1_1();
 
             AssertSql(
-                @"");
+                @"SELECT [x].[Id], [x].[Date], [x].[Name], [x].[OneToMany_Optional_Self_Inverse1Id], [x].[OneToMany_Required_Self_Inverse1Id], [x].[OneToOne_Optional_Self1Id]
+FROM [LevelOne] AS [x]
+LEFT JOIN [LevelTwo] AS [x.OneToOne_Optional_PK1] ON [x].[Id] = [x.OneToOne_Optional_PK1].[OneToOne_Optional_PK_Inverse2Id]
+WHERE ([x.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [x.OneToOne_Optional_PK1].[Name] IS NULL");
         }
 
         public override void Nav2()

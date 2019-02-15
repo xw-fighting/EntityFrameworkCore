@@ -722,6 +722,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 var elementType = constantExpression.Value.GetType().GetGenericArguments()[0];
                 var entityType = _model.FindEntityType(elementType);
 
+                var sourceMapping = new SourceMapping2
+                {
+                    RootEntityType = entityType,
+                };
+
+                var navigationTreeRoot = NavigationTreeNode2.Create(sourceMapping, navigation: null, parent: null);
+                sourceMapping.NavigationTree = navigationTreeRoot;
+
                 var result = new NavigationExpansionExpression(
                     constantExpression,
                     new NavigationExpansionExpressionState
@@ -738,13 +746,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             }
                         },
 
-                        SourceMappings2 = new List<SourceMapping2>
-                        {
-                            new SourceMapping2
-                            {
-                                RootEntityType = entityType,
-                            }
-                        }
+                        SourceMappings2 = new List<SourceMapping2> { sourceMapping }
                     },
                     constantExpression.Type);
 
@@ -778,54 +780,26 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             //nfev.Visit(boundLambda);
 
             var result = (source, parameter: state.CurrentParameter, pendingSelector: state.PendingSelector);
-
-            if (state.SourceMappings.Count != state.SourceMappings2.Count)
-            {
-                throw new InvalidOperationException("source mapping count mismatch!");
-            }
-
             foreach (var sourceMapping in state.SourceMappings2)
             {
-                foreach (var navigationTree in sourceMapping.FoundNavigations)
+                if (sourceMapping.NavigationTree.Flatten().Any(n => !n.Expanded))
                 {
-                    result = AddNavigationJoin2(
-                        result.source,
-                        result.parameter,
-                        sourceMapping,
-                        state.SourceMappings2,
-                        navigationTree,
-                        new List<INavigation>(),
-                        result.pendingSelector);
+                    foreach (var navigationTree in sourceMapping.NavigationTree.Children)
+                    {
+                        result = AddNavigationJoin2(
+                            result.source,
+                            result.parameter,
+                            sourceMapping,
+                            state.SourceMappings2,
+                            navigationTree,
+                            new List<INavigation>(),
+                            result.pendingSelector);
+                    }
                 }
             }
 
-            //foreach (var sourceMapping in state.SourceMappings)
-            //{
-            //    if (sourceMapping.FoundNavigations.Any(n => !n.Expanded))
-            //    {
-            //        foreach (var navigationTree in sourceMapping.FoundNavigations)
-            //        {
-            //            result = AddNavigationJoin(
-            //                result.source,
-            //                result.parameter,
-            //                sourceMapping,
-            //                state.SourceMappings,
-            //                navigationTree,
-            //                new List<INavigation>(),
-            //                result.pendingSelector);
-            //        }
-            //    }
-            //}
-
-            //var nrev = new NavigationReplacingExpressionVisitor(
-            //    state.CurrentParameter,
-            //    result.parameter);
-
-            //var newLambda = (LambdaExpression)nrev.Visit(boundLambda);
-
-
             var nrev2 = new NavigationReplacingExpressionVisitor2(
-                lambda.Parameters[0],// state.CurrentParameter,
+                lambda.Parameters[0],
                 result.parameter);
 
             var newLambda2 = (LambdaExpression)nrev2.Visit(boundLambda2);
@@ -835,69 +809,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 CurrentParameter = result.parameter,
                 SourceMappings = state.SourceMappings,
                 SourceMappings2 = state.SourceMappings2,
-                //FinalProjectionPath = state.FinalProjectionPath,
                 PendingSelector = result.pendingSelector,
             };
 
-            //return (result.source, lambda: newLambda, state: newState);
-            return (result.source, lambda: newLambda2, state: newState);
-        }
-
-        private (Expression source, LambdaExpression lambda, NavigationExpansionExpressionState state) FindAndApplyNavigations2(
-            Expression source,
-            LambdaExpression lambda,
-            NavigationExpansionExpressionState state)
-        {
-            var binder2 = new NavigationPropertyBindingExpressionVisitor2(
-                lambda.Parameters[0],//state.CurrentParameter,
-                state.SourceMappings2);
-
-            var boundLambda2 = binder2.Visit(lambda);
-
-            //var cnrev = new CollectionNavigationRewritingExpressionVisitor2(state.CurrentParameter);
-            //boundLambda = (LambdaExpression)cnrev.Visit(boundLambda);
-
-            //var nfev = new NavigationFindingExpressionVisitor(state.CurrentParameter);
-            //nfev.Visit(boundLambda);
-
-            var result = (source, parameter: state.CurrentParameter, pendingSelector: state.PendingSelector);
-
-            for (var i = 0; i < state.SourceMappings2.Count; i++)
-            {
-                var sourceMapping = state.SourceMappings[i];
-                var sourceMapping2 = state.SourceMappings2[i];
-
-                for (var j = 0; j < sourceMapping2.FoundNavigations.Count; j++)
-                {
-                    result = AddNavigationJoin(
-                        result.source,
-                        result.parameter,
-                        sourceMapping,
-                        sourceMapping2,
-                        state.SourceMappings,
-                        null, //sourceMapping.FoundNavigations[j],
-                        sourceMapping2.FoundNavigations[j],
-                        new List<INavigation>(),
-                        result.pendingSelector);
-                }
-            }
-
-            var nrev2 = new NavigationReplacingExpressionVisitor2(
-                lambda.Parameters[0],//state.CurrentParameter,
-                result.parameter);
-
-            var newLambda2 = (LambdaExpression)nrev2.Visit(boundLambda2);
-
-            var newState = new NavigationExpansionExpressionState
-            {
-                CurrentParameter = result.parameter,
-                SourceMappings = state.SourceMappings,
-                SourceMappings2 = state.SourceMappings2,
-                //FinalProjectionPath = state.FinalProjectionPath,
-                PendingSelector = result.pendingSelector,
-            };
-
-            //return (result.source, lambda: newLambda, state: newState);
             return (result.source, lambda: newLambda2, state: newState);
         }
 
@@ -1079,16 +993,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     parameterExpression = transparentIdentifierParameter;
                 }
 
-                sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                if (navigationTree.Optional)
-                {
-                    sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                }
+                //sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                //if (navigationTree.Optional)
+                //{
+                //    sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                //}
 
-                RemapNavigationChain(navigationTree2.Parent, navigationTree.Optional);
+                //RemapNavigationChain(navigationTree2.Parent, navigationTree.Optional);
 
-                // TODO: there should be only one mapping for the current navigation at this point, looping through "just in case"
-                navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                //// TODO: there should be only one mapping for the current navigation at this point, looping through "just in case"
+                //navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
 
                 // TODO: do we need to add the empty entry to ALL source mappings or just the one that is being processed?
                 if (navigationPath.Count == 0
@@ -1167,9 +1081,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             return result;
         }
 
-
-
-
         private (Expression source, ParameterExpression parameter, LambdaExpression pendingSelector) AddNavigationJoin2(
             Expression sourceExpression,
             ParameterExpression parameterExpression,
@@ -1179,7 +1090,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             List<INavigation> navigationPath,
             LambdaExpression pendingSelector)
         {
-            var path = navigationTree2.GeneratePath();
             if (!navigationTree2.Expanded)
             {
                 var navigation = navigationTree2.Navigation;
@@ -1189,7 +1099,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(navigationTargetEntityType.ClrType);
                 var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(sourceType, navigationTargetEntityType.ClrType);
 
-                var transparentIdentifierAccessorPath = navigationTree2.Parent?.ToMapping ?? sourceMapping2.RootToMapping;
+                var transparentIdentifierAccessorPath = navigationTree2.Parent.ToMapping;
 
                 //var transparentIdentifierAccessorPath = sourceMapping.TransparentIdentifierMapping.Where(
                 //    m => m.navigations.Count == navigationPath.Count
@@ -1347,16 +1257,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     parameterExpression = transparentIdentifierParameter;
                 }
 
-                sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                if (navigationTree2.Optional)
-                {
-                    sourceMapping2.RootToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                }
+                //// TODO: simplify, could probably do this in one step since root is part of the same tree structure now
+                //sourceMapping2.NavigationTree.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                //if (navigationTree2.Optional)
+                //{
+                //    sourceMapping2.NavigationTree.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                //}
 
                 RemapNavigationChain(navigationTree2.Parent, navigationTree2.Optional);
-
-                // TODO: there should be only one mapping for the current navigation at this point, looping through "just in case"
-                navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                navigationTree2.ToMapping = new List<string> { nameof(TransparentIdentifier<object, object>.Inner) };
+                navigationTree2.Expanded = true;
 
                 navigationPath.Add(navigation);
 
@@ -1371,7 +1281,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     pendingSelector = (LambdaExpression)psuev.Visit(pendingSelector);
                 }
 
-                navigationTree2.Expanded = true;
             }
             else
             {
@@ -1593,7 +1502,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             private ParameterExpression _rootParameter;
             private List<string> _currentPath = new List<string>();
 
-            private Dictionary<SourceMapping2, List<List<string>>> _newRootMappings;
             private Dictionary<NavigationTreeNode2, List<List<string>>> _newNavigationMappings;
 
             public FoundNavigationSelectorRemapper(ParameterExpression rootParameter)
@@ -1603,18 +1511,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
             public void Remap(Expression expression)
             {
-                _newRootMappings = new Dictionary<SourceMapping2, List<List<string>>>();
                 _newNavigationMappings = new Dictionary<NavigationTreeNode2, List<List<string>>>();
 
                 Visit(expression);
 
                 // TODO: clear old mappings, some navigations may/should become inaccessible
-
-                foreach (var mappingElement in _newRootMappings)
-                {
-                    mappingElement.Key.RootFromMappings = mappingElement.Value;
-                }
-
                 foreach (var mappingElement in _newNavigationMappings)
                 {
                     mappingElement.Key.FromMappings = mappingElement.Value;
@@ -1654,25 +1555,25 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     if (navigationBindingExpression.RootParameter == _rootParameter)
                     {
                         var navigationTreeNode = navigationBindingExpression.NavigationTreeNode;
-                        if (navigationTreeNode == null)
-                        {
-                            // TODO: DRY this - make source mapping a NavigationTreeNode without Navigation property
-                            if (!_newRootMappings.ContainsKey(navigationBindingExpression.SourceMapping))
-                            {
-                                _newRootMappings[navigationBindingExpression.SourceMapping] = new List<List<string>>();
-                            }
+                        //if (navigationTreeNode == null)
+                        //{
+                        //    // TODO: DRY this - make source mapping a NavigationTreeNode without Navigation property
+                        //    if (!_newRootMappings.ContainsKey(navigationBindingExpression.SourceMapping))
+                        //    {
+                        //        _newRootMappings[navigationBindingExpression.SourceMapping] = new List<List<string>>();
+                        //    }
 
-                            _newRootMappings[navigationBindingExpression.SourceMapping].Add(_currentPath.ToList());
+                        //    _newRootMappings[navigationBindingExpression.SourceMapping].Add(_currentPath.ToList());
 
-                            foreach (var rootFromMapping in navigationBindingExpression.SourceMapping.RootFromMappings)
-                            {
-                                foreach (var foundNavigation in navigationBindingExpression.SourceMapping.FoundNavigations)
-                                {
-                                    GenerateNewMapping(foundNavigation, rootFromMapping, _currentPath.ToList());
-                                }
-                            }
-                        }
-                        else
+                        //    foreach (var rootFromMapping in navigationBindingExpression.SourceMapping.RootFromMappings)
+                        //    {
+                        //        foreach (var foundNavigation in navigationBindingExpression.SourceMapping.FoundNavigations)
+                        //        {
+                        //            GenerateNewMapping(foundNavigation, rootFromMapping, _currentPath.ToList());
+                        //        }
+                        //    }
+                        //}
+                        //else
                         {
                             foreach (var fromMapping in navigationTreeNode.FromMappings)
                             {

@@ -257,13 +257,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         {
             if (parameterExpression == _rootParameter)
             {
-                var sourceMapping = _sourceMappings.Where(sm => sm.RootEntityType.ClrType == parameterExpression.Type && sm.RootFromMappings.Any(fm => fm.Count == 0)).SingleOrDefault();
+                // TODO: is this wrong? Accessible root could be pushed further into the navigation tree using projections
+                var sourceMapping = _sourceMappings.Where(sm => sm.RootEntityType.ClrType == parameterExpression.Type && sm.NavigationTree.FromMappings.Any(fm => fm.Count == 0)).SingleOrDefault();
                 if (sourceMapping != null)
                 {
                     return new NavigationBindingExpression2(
                         parameterExpression,
                         parameterExpression,
-                        navigationTreeNode: null,
+                        sourceMapping.NavigationTree,
                         sourceMapping.RootEntityType,
                         sourceMapping);
                 }
@@ -319,7 +320,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 foreach (var sourceMapping in _sourceMappings)
                 {
-                    var candidates = sourceMapping.FlattenNavigations().SelectMany(n => n.FromMappings, (n, m) => (navigationTreeNode: n, path: m)).ToList();
+                    var candidates = sourceMapping.NavigationTree.Flatten().SelectMany(n => n.FromMappings, (n, m) => (navigationTreeNode: n, path: m)).ToList();
                     var match = TryFindMatchingNavigationTreeNode(originalExpression, candidates);
                     if (match.navigationTreeNode != null)
                     {
@@ -327,7 +328,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             originalExpression,
                             match.rootParameter,
                             match.navigationTreeNode,
-                            match.navigationTreeNode.Navigation.GetTargetType(),
+                            match.navigationTreeNode.Navigation?.GetTargetType() ?? sourceMapping.RootEntityType,
                             // TODO: currently not matching root, navigation could be null!
                             //match.navigations.Count > 0 ? match.navigations.Last().GetTargetType() : sourceMapping.RootEntityType,
                             sourceMapping);
