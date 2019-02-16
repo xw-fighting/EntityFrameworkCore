@@ -22,9 +22,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
         public List<(List<string> path, List<INavigation> navigations)> TransparentIdentifierMapping { get; set; }
             = new List<(List<string> path, List<INavigation> navigations)>();
-
-        //public List<List<string>> RootFromMappings { get; set; } = new List<List<string>>() { new List<string>() };
-        //public List<string> RootToMapping { get; set; } = new List<string>();
     }
 
     public class SourceMapping2
@@ -32,34 +29,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public IEntityType RootEntityType { get; set; }
 
         public NavigationTreeNode2 NavigationTree { get; set; }
-        //public List<NavigationTreeNode2> FoundNavigations { get; set; } = new List<NavigationTreeNode2>();
-        //public List<List<string>> RootFromMappings { get; set; } = new List<List<string>>() { new List<string>() };
-        //public List<string> RootToMapping { get; set; } = new List<string>();
-
-        // TODO: fix this
-        //public List<NavigationTreeNode2> FlattenNavigations()
-        //{
-        //    var result = new List<NavigationTreeNode2>();
-        //    foreach (var navigationTreeNode in FoundNavigations)
-        //    {
-        //        result.AddRange(GetChildren(navigationTreeNode));
-        //    }
-
-        //    return result;
-        //}
-
-        //private List<NavigationTreeNode2> GetChildren(NavigationTreeNode2 navigationTreeNode)
-        //{
-        //    var result = new List<NavigationTreeNode2>();
-        //    result.Add(navigationTreeNode);
-
-        //    foreach (var child in navigationTreeNode.Children)
-        //    {
-        //        result.AddRange(GetChildren(child));
-        //    }
-
-        //    return result;
-        //}
     }
 
     public class NavigationExpansionExpressionState
@@ -86,13 +55,12 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public override bool CanReduce => true;
         public override Expression Reduce()
         {
-            if (/*State.FinalProjectionPath.Count == 0
-                &&*/ (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0]))
+            if (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0])
             {
                 // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
                 if (Operand.Type != _returnType)
                 {
-                    return Expression.Convert(Operand, _returnType);
+                    return Convert(Operand, _returnType);
                 }
 
                 return Operand;
@@ -100,7 +68,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
-            if (State.PendingSelector != null)
+
+            if (State.PendingSelector2 != null)
             {
                 var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
                     ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type)
@@ -109,6 +78,16 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
                 result = Call(pendingSelectMathod, result, State.PendingSelector);
                 parameter = Parameter(result.Type.GetGenericArguments()[0]);
             }
+
+            //if (State.PendingSelector != null)
+            //{
+            //    var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+            //        ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type)
+            //        : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
+
+            //    result = Call(pendingSelectMathod, result, State.PendingSelector);
+            //    parameter = Parameter(result.Type.GetGenericArguments()[0]);
+            //}
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
             { 

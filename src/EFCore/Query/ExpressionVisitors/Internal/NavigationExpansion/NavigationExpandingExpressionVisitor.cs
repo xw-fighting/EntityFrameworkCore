@@ -605,6 +605,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                     var result = Expression.Call(selectorMethodInfo, navigationExpansionExpression.Operand, newSelector);
                     state.PendingSelector = null;
+                    state.PendingSelector2 = null;
 
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
@@ -815,6 +816,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 var navigationTreeRoot = NavigationTreeNode2.CreateRoot(sourceMapping, fromMapping: new List<string>(), optional: false);
                 sourceMapping.NavigationTree = navigationTreeRoot;
 
+                var pendingSelectorParameter = Expression.Parameter(entityType.ClrType);
+
                 var result = new NavigationExpansionExpression(
                     constantExpression,
                     new NavigationExpansionExpressionState
@@ -831,7 +834,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             }
                         },
 
-                        SourceMappings2 = new List<SourceMapping2> { sourceMapping }
+                        SourceMappings2 = new List<SourceMapping2> { sourceMapping },
+                        PendingSelector2 = Expression.Lambda(pendingSelectorParameter, pendingSelectorParameter),
                     },
                     constantExpression.Type);
 
