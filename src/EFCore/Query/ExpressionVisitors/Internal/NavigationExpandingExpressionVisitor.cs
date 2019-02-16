@@ -214,30 +214,34 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
     public class NavigationTreeNode2
     {
         private NavigationTreeNode2(
-            INavigation navigation,
-            bool optional,
-            NavigationTreeNode2 parent)
+            [NotNull] INavigation navigation,
+            [NotNull] NavigationTreeNode2 parent,
+            bool optional)
         {
-            Navigation = navigation;
-            Optional = optional;
-            Parent = parent;
+            Check.NotNull(navigation, nameof(navigation));
+            Check.NotNull(parent, nameof(parent));
 
-            if (parent != null)
+            Navigation = navigation;
+            Parent = parent;
+            Optional = optional;
+            ToMapping = new List<string>();
+
+            foreach (var parentFromMapping in parent.FromMappings)
             {
-                foreach (var parentFromMapping in parent.FromMappings)
-                {
-                    var newMapping = parentFromMapping.ToList();
-                    newMapping.Add(navigation.Name);
-                    FromMappings.Add(newMapping);
-                }
+                var newMapping = parentFromMapping.ToList();
+                newMapping.Add(navigation.Name);
+                FromMappings.Add(newMapping);
             }
-            else
-            {
-                // root
-                FromMappings.Add(new List<string>());
-                ToMapping = new List<string>();
-                Expanded = true;
-            }
+        }
+
+        private NavigationTreeNode2(
+            List<string> fromMapping,
+            bool optional)
+        {
+            Optional = optional;
+            FromMappings.Add(fromMapping.ToList());
+            ToMapping = fromMapping.ToList();
+            Expanded = true;
         }
 
         public INavigation Navigation { get; private set; }
@@ -249,16 +253,25 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public List<List<string>> FromMappings { get; set; } = new List<List<string>>();
         public List<string> ToMapping { get; set; }// = new List<string>();
 
-        public static NavigationTreeNode2 Create(
-            SourceMapping2 sourceMapping,
-            INavigation navigation,
-            NavigationTreeNode2 parent)
+        public static NavigationTreeNode2 CreateRoot(
+            [NotNull] SourceMapping2 sourceMapping,
+            [NotNull] List<string> fromMapping,
+            bool optional)
         {
-            // navigation = null means root, represented as top level node in the NavigationTree
-            if (navigation == null)
-            {
-                return sourceMapping.NavigationTree ?? new NavigationTreeNode2(null, false, null);
-            }
+            Check.NotNull(sourceMapping, nameof(sourceMapping));
+            Check.NotNull(fromMapping, nameof(fromMapping));
+
+            return sourceMapping.NavigationTree ?? new NavigationTreeNode2(fromMapping, optional);
+        }
+
+        public static NavigationTreeNode2 Create(
+            [NotNull]SourceMapping2 sourceMapping,
+            [NotNull] INavigation navigation,
+            [NotNull] NavigationTreeNode2 parent)
+        {
+            Check.NotNull(sourceMapping, nameof(sourceMapping));
+            Check.NotNull(navigation, nameof(navigation));
+            Check.NotNull(parent, nameof(parent));
 
             var existingChild = parent.Children.Where(c => c.Navigation == navigation).SingleOrDefault();
             if (existingChild != null)
@@ -269,13 +282,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             // if (any) parent is optional, all children must be optional also
             // TODO: what about query filters?
             var optional = parent.Optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
-
-            var result = new NavigationTreeNode2(navigation, optional, parent);
-
-            if (parent != null)
-            {
-                parent.Children.Add(result);
-            }
+            var result = new NavigationTreeNode2(navigation, parent, optional);
+            parent.Children.Add(result);
 
             return result;
         }

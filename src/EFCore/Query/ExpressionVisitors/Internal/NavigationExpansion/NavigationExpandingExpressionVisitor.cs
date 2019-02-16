@@ -251,6 +251,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
             var result = FindAndApplyNavigations(source, selector/*combinedSelector*/, state);
             result.state.PendingSelector = result.lambda;
+            result.state.PendingSelector2 = (LambdaExpression)boundSelector2; // is this right??????
 
             var selectorRemapper = new FoundNavigationSelectorRemapper(selectorParameter);
             selectorRemapper.Remap(boundSelector2);
@@ -580,16 +581,73 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 state = navigationExpansionExpression.State;
                 state.CurrentParameter = state.CurrentParameter ?? currentParameter;
 
-                if (state.PendingSelector != null)
+                if (state.PendingSelector2 != null)
                 {
-                    var pendingSelectorParameter = state.PendingSelector.Parameters[0];
+                    var nrev = new NavigationReplacingExpressionVisitor2(
+                        state.PendingSelector2.Parameters[0],
+                        state.CurrentParameter);
 
-                    var binder = new NavigationPropertyBindingExpressionVisitor2(
-                        pendingSelectorParameter,
-                        state.SourceMappings2);
+                    var newSelector = nrev.Visit(state.PendingSelector2);
 
-                    var boundSelector = binder.Visit(state.PendingSelector);
+                    // TODO: test cases with casts, e.g. orders.Select(o => new { foo = (VipCustomer)o.Customer }).Distinct()
+                    var entityTypeOverride = methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType)
+                        ? _model.FindEntityType(methodCallExpression.Method.GetGenericArguments()[0])
+                        : null;
+
+                    var pssmg = new PendingSelectorSourceMappingGenerator(state.PendingSelector2.Parameters[0], entityTypeOverride);
+                    pssmg.Visit(state.PendingSelector2);
+
+                    state.SourceMappings2 = pssmg.SourceMappings;
+
+                    var selectorMethodInfo = QueryableSelectMethodInfo.MakeGenericMethod(
+                        state.CurrentParameter.Type,
+                        ((LambdaExpression)newSelector).Body.Type);
+
+                    var result = Expression.Call(selectorMethodInfo, navigationExpansionExpression.Operand, newSelector);
+                    state.PendingSelector = null;
+
+                    if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstOrDefaultMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleOrDefaultMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableAny)
+
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType))
+                    {
+                        var newMethod = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                            result.Type.GetGenericArguments()[0]);
+
+                        source = Expression.Call(newMethod, new[] { result });
+                        //source = methodCallExpression.Update(methodCallExpression.Object, new[] { result });
+                    }
+                    else if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableContains))
+                    {
+                        // TODO: is it necessary to visit the argument, or can we just pass it as is?
+                        var newArgument = Visit(methodCallExpression.Arguments[1]);
+
+                        source = methodCallExpression.Update(methodCallExpression.Object, new[] { result, newArgument });
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Unsupported method " + methodCallExpression.Method.Name);
+                    }
                 }
+                else
+                {
+                    // TODO: need to run thru Expression.Update?
+                    source = methodCallExpression;
+                }
+
+                state.CurrentParameter = null;
+
+                // TODO: should we be reusing state?
+                return new NavigationExpansionExpression(
+                    source,
+                    state,
+                    methodCallExpression.Type);
+
             }
 
             // we should never hit this
@@ -754,7 +812,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     RootEntityType = entityType,
                 };
 
-                var navigationTreeRoot = NavigationTreeNode2.Create(sourceMapping, navigation: null, parent: null);
+                var navigationTreeRoot = NavigationTreeNode2.CreateRoot(sourceMapping, fromMapping: new List<string>(), optional: false);
                 sourceMapping.NavigationTree = navigationTreeRoot;
 
                 var result = new NavigationExpansionExpression(
@@ -1301,8 +1359,21 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 //    sourceMapping2.NavigationTree.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
                 //}
 
-                RemapNavigationChain(navigationTree2.Parent, navigationTree2.Optional);
-                navigationTree2.ToMapping = new List<string> { nameof(TransparentIdentifier<object, object>.Inner) };
+                // remap navigation 'To' paths -> for this navigation prepend "Inner", for every other (already expanded) navigation prepend "Outer"
+                navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                foreach (var sourceMapping in allSourceMappings)
+                {
+                    foreach (var navigationTreeNode in sourceMapping.NavigationTree.Flatten().Where(n => n.Expanded && n != navigationTree2))
+                    {
+                        navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                        if (navigationTree2.Optional)
+                        {
+                            navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                        }
+                    }
+                }
+
+                //RemapNavigationChain(navigationTree2.Parent, navigationTree2.Optional);
                 navigationTree2.Expanded = true;
 
                 navigationPath.Add(navigation);
@@ -1644,6 +1715,78 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 {
                     GenerateNewMapping(child, currentMappingFragment, newMappingFragment);
                 }
+            }
+        }
+
+        private class PendingSelectorSourceMappingGenerator : ExpressionVisitor
+        {
+            private ParameterExpression _rootParameter;
+            private List<string> _currentPath = new List<string>();
+            private IEntityType _entityTypeOverride;
+
+            public List<SourceMapping2> SourceMappings = new List<SourceMapping2>();
+
+            public PendingSelectorSourceMappingGenerator(ParameterExpression rootParameter, IEntityType entityTypeOverride)
+            {
+                _rootParameter = rootParameter;
+                _entityTypeOverride = entityTypeOverride;
+            }
+
+            // prune these nodes, we only want to look for entities accessible in the result
+            protected override Expression VisitMember(MemberExpression memberExpression)
+                => memberExpression;
+
+            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+                => methodCallExpression;
+
+            // TODO: coalesce should pass? - TEST!
+            protected override Expression VisitBinary(BinaryExpression binaryExpression)
+                => binaryExpression;
+
+            protected override Expression VisitUnary(UnaryExpression unaryExpression)
+            {
+                // TODO: handle cast here?
+
+                return base.VisitUnary(unaryExpression);
+            }
+
+            protected override Expression VisitNew(NewExpression newExpression)
+            {
+                // TODO: when constructing a DTO, there will be arguments present, but no members - is it correct to just skip in this case?
+                if (newExpression.Members != null)
+                {
+                    for (var i = 0; i < newExpression.Arguments.Count; i++)
+                    {
+                        _currentPath.Add(newExpression.Members[i].Name);
+                        Visit(newExpression.Arguments[i]);
+                        _currentPath.RemoveAt(_currentPath.Count - 1);
+                    }
+                }
+
+                return newExpression;
+            }
+
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+                {
+                    if (navigationBindingExpression.RootParameter == _rootParameter)
+                    {
+                        var sourceMapping = new SourceMapping2
+                        {
+                            RootEntityType = _entityTypeOverride ?? navigationBindingExpression.EntityType,
+                        };
+
+                        var navigationTreeRoot = NavigationTreeNode2.CreateRoot(sourceMapping, _currentPath.ToList(), navigationBindingExpression.NavigationTreeNode.Optional);
+                        sourceMapping.NavigationTree = navigationTreeRoot;
+
+                        SourceMappings.Add(sourceMapping);
+                    }
+
+                    return extensionExpression;
+                }
+
+                return base.VisitExtension(extensionExpression);
             }
         }
 

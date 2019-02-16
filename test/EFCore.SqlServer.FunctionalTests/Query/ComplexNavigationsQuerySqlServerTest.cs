@@ -4129,6 +4129,22 @@ WHERE ([l1.OneToOne_Optional_FK1.OneToOne_Optional_PK2].[Name] <> N'Foo') OR [l1
                 @"");
         }
 
+        public override void Nav5_1()
+        {
+            base.Nav5_1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav5_2()
+        {
+            base.Nav5_2();
+
+            AssertSql(
+                @"");
+        }
+
         public override void Nav55()
         {
             base.Nav55();
