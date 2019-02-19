@@ -10,6 +10,7 @@ using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
@@ -38,6 +39,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public List<SourceMapping2> SourceMappings2 { get; set; } = new List<SourceMapping2>();
         public LambdaExpression PendingSelector { get; set; }
         public LambdaExpression PendingSelector2 { get; set; }
+        public bool ApplyPendingSelector { get; set; }
     }
 
     public class NavigationExpansionExpression : Expression, IPrintable
@@ -55,7 +57,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public override bool CanReduce => true;
         public override Expression Reduce()
         {
-            if (State.PendingSelector == null || State.PendingSelector.Body == State.PendingSelector.Parameters[0])
+            if (!State.ApplyPendingSelector)
             {
                 // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
                 if (Operand.Type != _returnType)
@@ -69,33 +71,26 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
 
-            if (State.PendingSelector2 != null)
-            {
-                var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                    ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type)
-                    : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
+            // final navigation rewrite
+            // TODO: do this somewhere else? (so that Reduce method is not so complex)
+            var nrev2 = new NavigationReplacingExpressionVisitor2(
+                State.PendingSelector2.Parameters[0],
+                State.CurrentParameter);
 
-                result = Call(pendingSelectMathod, result, State.PendingSelector);
-                parameter = Parameter(result.Type.GetGenericArguments()[0]);
-            }
+            var pendingSelector = (LambdaExpression)nrev2.Visit(State.PendingSelector2);
 
-            //if (State.PendingSelector != null)
-            //{
-            //    var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-            //        ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type)
-            //        : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, State.PendingSelector.Body.Type);
+            var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)
+                : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type);
 
-            //    result = Call(pendingSelectMathod, result, State.PendingSelector);
-            //    parameter = Parameter(result.Type.GetGenericArguments()[0]);
-            //}
+            result = Call(pendingSelectMathod, result, pendingSelector);
+            parameter = Parameter(result.Type.GetGenericArguments()[0]);
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
             { 
                 var toOrderedMethodInfo = typeof(NavigationExpansionExpression).GetMethod(nameof(NavigationExpansionExpression.ToOrdered)).MakeGenericMethod(parameter.Type);
 
-                result = Call(toOrderedMethodInfo, result);
-
-                return result;
+                return Call(toOrderedMethodInfo, result);
             }
 
             return result;
