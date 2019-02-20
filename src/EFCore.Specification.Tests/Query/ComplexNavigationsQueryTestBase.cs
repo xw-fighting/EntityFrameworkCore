@@ -5813,6 +5813,38 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
+        [ConditionalFact]
+        public virtual void Nav13()
+        {
+            using (var ctx = CreateContext())
+            {
+                //var query = ctx.LevelOne.Select(e => new { one = e.OneToOne_Optional_FK1 }).Select(x => new { two = x });
+                var query = ctx.LevelOne.Select(e => new { one = e.OneToOne_Optional_FK1 }).Select(x => x);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav14()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(e => new { foo = new { bar = e.OneToOne_Optional_FK1.Id, baz = e.OneToOne_Optional_FK1 } }).Select(x => new { x, x.foo, x.foo.bar, x.foo.baz });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav15()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(e => new { one = e.OneToOne_Optional_FK1 }).Select(x => new { two = x, three = x.one, four = x.one.OneToOne_Optional_FK2 });
+                var result = query.ToList();
+            }
+        }
+
+
 
         [ConditionalFact]
         public virtual void SelectMany1()
@@ -5874,6 +5906,68 @@ namespace Microsoft.EntityFrameworkCore.Query
                 var result = query.ToList();
             }
         }
+
+        [ConditionalFact]
+        public virtual void Join1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Join(ctx.LevelTwo, o => o.Id, i => i.Id, (o, i) => new { o, i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Join2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Join(ctx.LevelTwo.Where(l2 => l2.OneToOne_Optional_FK2.Name != "Foo"), o => o.Id, i => i.Id, (o, i) => new { o, i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Join3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => new { foo = l1.OneToOne_Optional_PK1 }).Join(ctx.LevelTwo, o => o.foo.Id, i => i.Id, (o, i) => new { o, i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Join4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => new { foo = l1.OneToOne_Optional_PK1 }).Join(ctx.LevelTwo, o => o.foo.Id, i => i.Id, (o, i) => new { bar = o, baz = i });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Join5()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => new { foo = l1.OneToOne_Optional_PK1 }).Join(ctx.LevelTwo, o => o.foo.Id, i => i.Id, (o, i) => new { bar = o.foo, baz = i });
+                var result = query.ToList();
+            }
+        }
+
+
+        [ConditionalFact]
+        public virtual void Join6()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => new { foo = l1.OneToOne_Optional_PK1 }).Join(ctx.LevelTwo, o => o.foo.Id, i => i.Id, (o, i) => new { bar = o.foo.OneToOne_Optional_FK2, baz = i });
+                var result = query.ToList();
+            }
+        }
+
 
         [ConditionalFact]
         public virtual void ComplexWhere()

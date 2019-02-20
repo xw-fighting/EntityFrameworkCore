@@ -11,10 +11,33 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
     {
         protected override Expression VisitExtension(Expression extensionExpression)
         {
+            if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression2)
+            {
+                // TODO: move to binder itself, this implementaion detail shouldn't leak to the base class!!!!
+
+                // navigation binding would convert "naked" ParameterExpression into NavigationBindingExpression
+                // in that case, we want to unwrap the root
+                var newRootParameter = navigationBindingExpression2.RootParameter;
+                var newRootParameterVisitResult = Visit(navigationBindingExpression2.RootParameter);
+                if (newRootParameterVisitResult is NavigationBindingExpression2 nbe)
+                {
+                    newRootParameter = nbe.RootParameter;
+                }
+
+                var newOperand = Visit(navigationBindingExpression2.Operand);
+
+                return newRootParameter != navigationBindingExpression2.RootParameter || newOperand != navigationBindingExpression2.Operand
+                    ? new NavigationBindingExpression2(
+                        newOperand,
+                        newRootParameter,
+                        navigationBindingExpression2.NavigationTreeNode,
+                        navigationBindingExpression2.EntityType,
+                        navigationBindingExpression2.SourceMapping)
+                    : navigationBindingExpression2;
+            }
+            
             if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
-                // TODO: hack, navigation binding would convert "naked" ParameterExpression into NavigationBindingExpression
-                // in that case, we want to unwrap the root
                 var newRootParameter = navigationBindingExpression.RootParameter;
                 var newRootParameterVisitResult = Visit(navigationBindingExpression.RootParameter);
                 if (newRootParameterVisitResult is NavigationBindingExpression nbe)
