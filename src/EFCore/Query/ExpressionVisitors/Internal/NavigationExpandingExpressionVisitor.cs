@@ -53,6 +53,54 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             return (LambdaExpression)lcev.Visit(second);
         }
+
+
+        //public static Expression RemapExpression(Expression targetExpression, ParameterExpression targetParameterExpression, Expression replaceParameterWithExpression)
+        //{
+        //    new ExpressionReplacingVisitor()
+
+
+
+
+        //}
+
+        // TODO: DRY this entire thing
+        private class ExpressionReplacingVisitor : ExpressionVisitor
+        {
+            private Expression _searchedFor;
+            private Expression _replaceWith;
+
+            public ExpressionReplacingVisitor(Expression searchedFor, Expression replaceWith)
+            {
+                _searchedFor = searchedFor;
+                _replaceWith = replaceWith;
+            }
+
+            public override Expression Visit(Expression expression)
+                => expression == _searchedFor
+                ? _replaceWith
+                : base.Visit(expression);
+
+            // TODO: DRY
+            protected override Expression VisitExtension(Expression extensionExpression)
+            {
+                if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+                {
+                    var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression.RootParameter);
+
+                    return newRootParameter != navigationBindingExpression.RootParameter
+                        ? new NavigationBindingExpression2(
+                            newRootParameter,
+                            navigationBindingExpression.NavigationTreeNode,
+                            navigationBindingExpression.EntityType,
+                            navigationBindingExpression.SourceMapping,
+                            navigationBindingExpression.Type)
+                        : navigationBindingExpression;
+                }
+
+                throw new InvalidOperationException("Unhandled extension expression: " + extensionExpression);
+            }
+        }
     }
 
     // TODO: temporary hack
@@ -315,6 +363,34 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
                 return result;
             }
+        }
+
+        public Expression BuildExpression(ParameterExpression root)
+        {
+            var result = (Expression)root;
+            foreach (var accessorPathElement in ToMapping)
+            {
+                // TODO: nasty hack, clean this up!!!!
+                if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
+                {
+                    result = Expression.Property(result, accessorPathElement);
+                }
+                else
+                {
+                    result = Expression.Field(result, accessorPathElement);
+                }
+            }
+
+            return result;
+        }
+
+        // TODO: this shouldn't be needed eventually, temporary hack
+        public List<INavigation> NavigationChain()
+        {
+            var result = Parent?.NavigationChain() ?? new List<INavigation>();
+            result.Add(Navigation);
+
+            return result;
         }
     }
 }

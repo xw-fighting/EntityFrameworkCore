@@ -106,4 +106,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 : parameterExpression;
         }
     }
+
+    public class LambdaApplyingExpressionVisitor : NavigationExpansionExpressionVisitorBase
+    {
+
+    }
 }

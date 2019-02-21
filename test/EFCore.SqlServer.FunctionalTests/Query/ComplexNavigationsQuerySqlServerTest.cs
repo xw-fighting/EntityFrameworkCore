@@ -4237,7 +4237,9 @@ WHERE (([l1.OneToOne_Optional_PK1].[Name] <> N'Foo') OR [l1.OneToOne_Optional_PK
             base.Nav14();
 
             AssertSql(
-                @"");
+                @"SELECT [l.OneToOne_Optional_FK1].[Id] AS [bar], [l.OneToOne_Optional_FK1].[Date], [l.OneToOne_Optional_FK1].[Level1_Optional_Id], [l.OneToOne_Optional_FK1].[Level1_Required_Id], [l.OneToOne_Optional_FK1].[Name], [l.OneToOne_Optional_FK1].[OneToMany_Optional_Inverse2Id], [l.OneToOne_Optional_FK1].[OneToMany_Optional_Self_Inverse2Id], [l.OneToOne_Optional_FK1].[OneToMany_Required_Inverse2Id], [l.OneToOne_Optional_FK1].[OneToMany_Required_Self_Inverse2Id], [l.OneToOne_Optional_FK1].[OneToOne_Optional_PK_Inverse2Id], [l.OneToOne_Optional_FK1].[OneToOne_Optional_Self2Id]
+FROM [LevelOne] AS [l]
+LEFT JOIN [LevelTwo] AS [l.OneToOne_Optional_FK1] ON [l].[Id] = [l.OneToOne_Optional_FK1].[Level1_Optional_Id]");
         }
 
 

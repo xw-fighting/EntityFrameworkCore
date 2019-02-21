@@ -5829,7 +5829,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             using (var ctx = CreateContext())
             {
-                var query = ctx.LevelOne.Select(e => new { foo = new { bar = e.OneToOne_Optional_FK1.Id, baz = e.OneToOne_Optional_FK1 } }).Select(x => new { x, x.foo, x.foo.bar, x.foo.baz });
+                var query = ctx.LevelOne.Select(e => new { foo = new { bar = (int?)e.OneToOne_Optional_FK1.Id, baz = e.OneToOne_Optional_FK1 } }).Select(x => new { x, x.foo, x.foo.bar, x.foo.baz });
                 var result = query.ToList();
             }
         }

@@ -52,31 +52,27 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
     public class NavigationBindingExpression2 : Expression, IPrintable
     {
-        public Expression Operand { get; }
         public ParameterExpression RootParameter { get; }
         public IEntityType EntityType { get; }
         public NavigationTreeNode2 NavigationTreeNode { get; }
         public SourceMapping2 SourceMapping { get; }
 
         public override ExpressionType NodeType => ExpressionType.Extension;
-        public override bool CanReduce => true;
-        public override Type Type => Operand.Type;
-
-        public override Expression Reduce()
-            => Operand;
+        public override bool CanReduce => false;
+        public override Type Type { get; }
 
         public NavigationBindingExpression2(
-            Expression operand,
             ParameterExpression rootParameter,
             NavigationTreeNode2 navigationTreeNode,
             IEntityType entityType,
-            SourceMapping2 sourceMapping)
+            SourceMapping2 sourceMapping,
+            Type type)
         {
-            Operand = operand;
             RootParameter = rootParameter;
             NavigationTreeNode = navigationTreeNode;
             EntityType = entityType;
             SourceMapping = sourceMapping;
+            Type = type;
         }
 
         public void Print([NotNull] ExpressionPrinter expressionPrinter)

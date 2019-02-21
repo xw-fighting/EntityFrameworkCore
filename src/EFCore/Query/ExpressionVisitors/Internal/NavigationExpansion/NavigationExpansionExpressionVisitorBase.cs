@@ -24,15 +24,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     newRootParameter = nbe.RootParameter;
                 }
 
-                var newOperand = Visit(navigationBindingExpression2.Operand);
-
-                return newRootParameter != navigationBindingExpression2.RootParameter || newOperand != navigationBindingExpression2.Operand
+                return newRootParameter != navigationBindingExpression2.RootParameter
                     ? new NavigationBindingExpression2(
-                        newOperand,
                         newRootParameter,
                         navigationBindingExpression2.NavigationTreeNode,
                         navigationBindingExpression2.EntityType,
-                        navigationBindingExpression2.SourceMapping)
+                        navigationBindingExpression2.SourceMapping,
+                        navigationBindingExpression2.Type)
                     : navigationBindingExpression2;
             }
             
