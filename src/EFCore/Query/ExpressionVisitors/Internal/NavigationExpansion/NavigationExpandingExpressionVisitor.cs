@@ -666,9 +666,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         newPendingSelectorParameter,
                         pssmg.BindingToSourceMapping);
 
-                    state.PendingSelector2 = (LambdaExpression)psg.Visit(state.PendingSelector2);
+                    state.PendingSelector2 = Expression.Lambda(newPendingSelectorParameter, newPendingSelectorParameter);
+
+                    //state.PendingSelector2 = (LambdaExpression)psg.Visit(state.PendingSelector2);
                     state.ApplyPendingSelector = false;
                     state.CurrentParameter = newPendingSelectorParameter;
+
+                    // TODO: hack!!!
+                    //if (psg.RootProjectionMapping != null)
+                    //{
+                    //    state.SourceMappings2.Add(psg.RootProjectionMapping);
+                    //}
 
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
@@ -722,6 +730,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             private Dictionary<NavigationBindingExpression2, SourceMapping2> _bindingToSourceMapping;
             private List<string> _currentPath = new List<string>();
 
+            // TODO: hack!!!
+            public SourceMapping2 RootProjectionMapping { get; private set; }
+
             public PendingSelectorGenerator(
                 ParameterExpression oldParameter,
                 ParameterExpression newParameter,
@@ -768,16 +779,32 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     {
                         _currentPath.Add(newExpression.Members[i].Name);
                         var newArgument = Visit(newExpression.Arguments[i]);
-                        if (newArgument == newExpression.Arguments[i])
-                        {
-                            var result = (Expression)_newParameter;
-                            foreach (var pathElement in _currentPath)
-                            {
-                                result = Expression.PropertyOrField(result, pathElement);
-                            }
+                        //if (newArgument == newExpression.Arguments[i])
+                        //{
+                        //    if (RootProjectionMapping == null)
+                        //    {
+                        //        RootProjectionMapping = new SourceMapping2
+                        //        {
+                        //            RootEntityType = null
+                        //        };
 
-                            newArgument = result;
-                        }
+                        //        RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
+                        //    }
+
+                        //    var result = (Expression)new NavigationBindingExpression2(
+                        //        _newParameter,
+                        //        RootProjectionMapping.NavigationTree,
+                        //        null,
+                        //        RootProjectionMapping,
+                        //        _newParameter.Type);
+
+                        //    foreach (var pathElement in _currentPath)
+                        //    {
+                        //        result = Expression.PropertyOrField(result, pathElement);
+                        //    }
+
+                        //    newArgument = result;
+                        //}
 
                         newArguments.Add(newArgument);
                         _currentPath.RemoveAt(_currentPath.Count - 1);
@@ -805,8 +832,27 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                         return newBinding;
                     }
+                    else
+                    {
+                        if (RootProjectionMapping == null)
+                        {
+                            RootProjectionMapping = new SourceMapping2
+                            {
+                                RootEntityType = null
+                            };
 
-                    return extensionExpression;
+                            RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
+                        }
+
+                        return new NavigationBindingExpression2(
+                            _newParameter,
+                            RootProjectionMapping.NavigationTree,
+                            null,
+                            RootProjectionMapping,
+                            _newParameter.Type);
+                    }
+
+                    //return extensionExpression;
                     //else
                     //{
                     //    var result = (Expression)_newParameter;
@@ -820,6 +866,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 }
 
                 throw new InvalidOperationException("Unhandled expression: " + extensionExpression);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression parameterExpression)
+            {
+                return base.VisitParameter(parameterExpression);
             }
 
             // TODO: DRY
