@@ -7252,8 +7252,17 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             using (var ctx = CreateContext())
             {
-                //var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").Where(g => g.Nickname == "Marcus").Select(g => new { officer = (Officer)g, }).Where(x => x.officer.AssignedCity.Location != "Bar");
                 var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => (LocustHorde)f).Distinct().Where(lh => lh.Commander.Name != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_Distinct_with_convert_anonymous()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => new { horde = (LocustHorde)f }).Distinct().Where(lh => lh.horde.Commander.Name != "Bar");
                 var result = query.ToList();
             }
         }

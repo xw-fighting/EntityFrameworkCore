@@ -4423,6 +4423,13 @@ INNER JOIN [LevelTwo] AS [i] ON [l1.OneToOne_Optional_PK1].[Id] = [i].[Id]");
                 @"");
         }
 
+        public override void Join7()
+        {
+            base.Join7();
+
+            AssertSql(
+                @"");
+        }
 
         public override void ComplexWhere()
         {

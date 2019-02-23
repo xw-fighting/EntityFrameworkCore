@@ -5998,6 +5998,17 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
+        [ConditionalFact]
+        public virtual void Join7()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => new { nav1 = l1.OneToOne_Optional_PK1, entity1 = l1, prop1 = l1.Id }).Distinct()
+                    .Join(ctx.LevelTwo.Select(l2 => new { n2 = l2.OneToOne_Optional_FK2, e2 = l2, p2 = l2.Id }).Distinct(),
+                    o => o.nav1.Id, i => i.p2, (o, i) => new { outer_nav = o.nav1, outer_entity = o.entity1, outer_prop = o.prop1, inner_nav = i.n2, inner_entity = i.e2, inner_prop = i.p2 });
+                var result = query.ToList();
+            }
+        }
 
         [ConditionalFact]
         public virtual void ComplexWhere()

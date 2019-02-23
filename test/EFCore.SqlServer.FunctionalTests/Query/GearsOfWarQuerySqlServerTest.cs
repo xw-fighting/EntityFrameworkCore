@@ -8217,6 +8217,14 @@ WHERE (([g].[Discriminator] = N'Officer') AND (([g.Tag].[Note] <> N'Foo') OR [g.
                 @"");
         }
 
+        public override void Nav_rewrite_Distinct_with_convert_anonymous()
+        {
+            base.Nav_rewrite_Distinct_with_convert_anonymous();
+
+            AssertSql(
+                @"");
+        }
+
         public override void Nav_rewrite_with_convert1()
         {
             base.Nav_rewrite_with_convert1();

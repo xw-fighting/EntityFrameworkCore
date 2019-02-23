@@ -17,12 +17,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 // navigation binding would convert "naked" ParameterExpression into NavigationBindingExpression
                 // in that case, we want to unwrap the root
-                var newRootParameter = navigationBindingExpression2.RootParameter;
-                var newRootParameterVisitResult = Visit(navigationBindingExpression2.RootParameter);
-                if (newRootParameterVisitResult is NavigationBindingExpression2 nbe)
-                {
-                    newRootParameter = nbe.RootParameter;
-                }
+                //var newRootParameter = navigationBindingExpression2.RootParameter;
+                //var newRootParameterVisitResult = Visit(navigationBindingExpression2.RootParameter);
+                //if (newRootParameterVisitResult is NavigationBindingExpression2 nbe)
+                //{
+                //    newRootParameter = nbe.RootParameter;
+                //}
+
+                var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression2.RootParameter);
 
                 return newRootParameter != navigationBindingExpression2.RootParameter
                     ? new NavigationBindingExpression2(
@@ -33,7 +35,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         navigationBindingExpression2.Type)
                     : navigationBindingExpression2;
             }
-            
+
+            if (extensionExpression is CustomRootExpression customRootExpression)
+            {
+                var newRootParameter = (ParameterExpression)Visit(customRootExpression.RootParameter);
+
+                return newRootParameter != customRootExpression.RootParameter
+                    ? new CustomRootExpression(newRootParameter, customRootExpression.Mapping, customRootExpression.Type)
+                    : customRootExpression;
+            }
+
             if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
                 var newRootParameter = navigationBindingExpression.RootParameter;

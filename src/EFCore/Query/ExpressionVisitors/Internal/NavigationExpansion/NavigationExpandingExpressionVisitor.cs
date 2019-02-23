@@ -81,8 +81,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 //case nameof(Queryable.DefaultIfEmpty):
                     return ProcessTerminatingOperation3(methodCallExpression);
 
-                //case nameof(Queryable.Join):
-                //    return ProcessJoin2(methodCallExpression);
+                case nameof(Queryable.Join):
+                    return ProcessJoin(methodCallExpression);
 
                 default:
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
@@ -498,6 +498,65 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             }
         }
 
+        private Expression ProcessJoin(MethodCallExpression methodCallExpression)
+        {
+            var outerSource = Visit(methodCallExpression.Arguments[0]);
+            var innerSource = Visit(methodCallExpression.Arguments[1]);
+
+            var outerKeySelector = methodCallExpression.Arguments[2].UnwrapQuote();
+            var innerKeySelector = methodCallExpression.Arguments[3].UnwrapQuote();
+            var resultSelector = methodCallExpression.Arguments[4].UnwrapQuote();
+
+            var outerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = outerKeySelector.Parameters[0]
+            };
+
+            var innerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = innerKeySelector.Parameters[0]
+            };
+
+            if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
+            {
+                outerSource = outerNavigationExpansionExpression.Operand;
+                outerState = AdjustState2(outerState, outerNavigationExpansionExpression);
+            }
+
+            if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
+            {
+                innerSource = innerNavigationExpansionExpression.Operand;
+                innerState = AdjustState2(outerState, innerNavigationExpansionExpression);
+            }
+
+            var outerResult = FindAndApplyNavigations(outerSource, outerKeySelector, outerState);
+            var innerResult = FindAndApplyNavigations(innerSource, innerKeySelector, innerState);
+
+            var resultSelectorRemap = RemapTwoArgumentResultSelector3(resultSelector, outerResult.state, innerResult.state);
+
+            var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                outerResult.state.CurrentParameter.Type,
+                innerResult.state.CurrentParameter.Type,
+                outerResult.lambdaBody.Type,
+                resultSelectorRemap.lambda.Body.Type);
+
+            var rewritten = Expression.Call(
+                newMethodInfo,
+                outerResult.source,
+                innerResult.source,
+                Expression.Lambda(outerResult.lambdaBody, outerResult.state.CurrentParameter),
+                Expression.Lambda(innerResult.lambdaBody, innerResult.state.CurrentParameter),
+                Expression.Lambda(resultSelectorRemap.lambda.Body, outerResult.state.CurrentParameter, innerResult.state.CurrentParameter));
+
+            var result = FindAndApplyNavigations(rewritten, resultSelectorRemap.state.PendingSelector2, resultSelectorRemap.state);
+            resultSelectorRemap.state.PendingSelector2 = Expression.Lambda(result.lambdaBody, result.state.CurrentParameter);
+
+            return new NavigationExpansionExpression(
+                result.source,
+                result.state,
+                methodCallExpression.Type);
+        }
+
         //private Expression ProcessJoin(MethodCallExpression methodCallExpression)
         //{
         //    var outerSource = Visit(methodCallExpression.Arguments[0]);
@@ -655,8 +714,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     var pssmg = new PendingSelectorSourceMappingGenerator(state.PendingSelector2.Parameters[0], entityTypeOverride);
                     pssmg.Visit(state.PendingSelector2);
 
-                    //state.SourceMappings2 = pssmg.SourceMappings;
-
                     var selectorMethodInfo = QueryableSelectMethodInfo.MakeGenericMethod(
                         state.CurrentParameter.Type,
                         newSelectorBody.Type);
@@ -693,18 +750,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         PendingSelector2 = Expression.Lambda(newPendingSelectorBody, newPendingSelectorParameter),
                         SourceMappings2 = pssmg.SourceMappings
                     };
-
-                    //state.PendingSelector2 = Expression.Lambda(newPendingSelectorParameter, newPendingSelectorParameter);
-
-                    //state.PendingSelector2 = (LambdaExpression)psg.Visit(state.PendingSelector2);
-                    //state.ApplyPendingSelector = false;
-                    //state.CurrentParameter = newPendingSelectorParameter;
-
-                    // TODO: hack!!!
-                    //if (psg.RootProjectionMapping != null)
-                    //{
-                    //    state.SourceMappings2.Add(psg.RootProjectionMapping);
-                    //}
 
                     if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
@@ -751,180 +796,180 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             return methodCallExpression;
         }
 
-        private class PendingSelectorGenerator : ExpressionVisitor
-        {
-            private ParameterExpression _oldParameter;
-            private ParameterExpression _newParameter;
-            private Dictionary<NavigationBindingExpression2, SourceMapping2> _bindingToSourceMapping;
-            private List<string> _currentPath = new List<string>();
+        //private class PendingSelectorGenerator : ExpressionVisitor
+        //{
+        //    private ParameterExpression _oldParameter;
+        //    private ParameterExpression _newParameter;
+        //    private Dictionary<NavigationBindingExpression2, SourceMapping2> _bindingToSourceMapping;
+        //    private List<string> _currentPath = new List<string>();
 
-            // TODO: hack!!!
-            public SourceMapping2 RootProjectionMapping { get; private set; }
+        //    // TODO: hack!!!
+        //    public SourceMapping2 RootProjectionMapping { get; private set; }
 
-            public PendingSelectorGenerator(
-                ParameterExpression oldParameter,
-                ParameterExpression newParameter,
-                Dictionary<NavigationBindingExpression2, SourceMapping2> bindingToSourceMapping)
-            {
-                _oldParameter = oldParameter;
-                _newParameter = newParameter;
-                _bindingToSourceMapping = bindingToSourceMapping;
-            }
+        //    public PendingSelectorGenerator(
+        //        ParameterExpression oldParameter,
+        //        ParameterExpression newParameter,
+        //        Dictionary<NavigationBindingExpression2, SourceMapping2> bindingToSourceMapping)
+        //    {
+        //        _oldParameter = oldParameter;
+        //        _newParameter = newParameter;
+        //        _bindingToSourceMapping = bindingToSourceMapping;
+        //    }
 
-            protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
-            {
-                // TODO: combine this with navigation replacing expression visitor? logic is the same
-                var newParameters = new List<ParameterExpression>();
-                var parameterChanged = false;
+        //    protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
+        //    {
+        //        // TODO: combine this with navigation replacing expression visitor? logic is the same
+        //        var newParameters = new List<ParameterExpression>();
+        //        var parameterChanged = false;
 
-                foreach (var parameter in lambdaExpression.Parameters)
-                {
-                    if (parameter == _oldParameter)
-                    {
-                        newParameters.Add(_newParameter);
-                        parameterChanged = true;
-                    }
-                    else
-                    {
-                        newParameters.Add(parameter);
-                    }
-                }
+        //        foreach (var parameter in lambdaExpression.Parameters)
+        //        {
+        //            if (parameter == _oldParameter)
+        //            {
+        //                newParameters.Add(_newParameter);
+        //                parameterChanged = true;
+        //            }
+        //            else
+        //            {
+        //                newParameters.Add(parameter);
+        //            }
+        //        }
 
-                var newBody = Visit(lambdaExpression.Body);
+        //        var newBody = Visit(lambdaExpression.Body);
 
-                return parameterChanged || newBody != lambdaExpression.Body
-                    ? Expression.Lambda(newBody, newParameters)
-                    : lambdaExpression;
-            }
+        //        return parameterChanged || newBody != lambdaExpression.Body
+        //            ? Expression.Lambda(newBody, newParameters)
+        //            : lambdaExpression;
+        //    }
 
-            protected override Expression VisitNew(NewExpression newExpression)
-            {
-                // TODO: when constructing a DTO, there will be arguments present, but no members - is it correct to just skip in this case?
-                if (newExpression.Members != null)
-                {
-                    var newArguments = new List<Expression>();
-                    for (var i = 0; i < newExpression.Arguments.Count; i++)
-                    {
-                        _currentPath.Add(newExpression.Members[i].Name);
-                        var newArgument = Visit(newExpression.Arguments[i]);
-                        //if (newArgument == newExpression.Arguments[i])
-                        //{
-                        //    if (RootProjectionMapping == null)
-                        //    {
-                        //        RootProjectionMapping = new SourceMapping2
-                        //        {
-                        //            RootEntityType = null
-                        //        };
+        //    protected override Expression VisitNew(NewExpression newExpression)
+        //    {
+        //        // TODO: when constructing a DTO, there will be arguments present, but no members - is it correct to just skip in this case?
+        //        if (newExpression.Members != null)
+        //        {
+        //            var newArguments = new List<Expression>();
+        //            for (var i = 0; i < newExpression.Arguments.Count; i++)
+        //            {
+        //                _currentPath.Add(newExpression.Members[i].Name);
+        //                var newArgument = Visit(newExpression.Arguments[i]);
+        //                //if (newArgument == newExpression.Arguments[i])
+        //                //{
+        //                //    if (RootProjectionMapping == null)
+        //                //    {
+        //                //        RootProjectionMapping = new SourceMapping2
+        //                //        {
+        //                //            RootEntityType = null
+        //                //        };
 
-                        //        RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
-                        //    }
+        //                //        RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
+        //                //    }
 
-                        //    var result = (Expression)new NavigationBindingExpression2(
-                        //        _newParameter,
-                        //        RootProjectionMapping.NavigationTree,
-                        //        null,
-                        //        RootProjectionMapping,
-                        //        _newParameter.Type);
+        //                //    var result = (Expression)new NavigationBindingExpression2(
+        //                //        _newParameter,
+        //                //        RootProjectionMapping.NavigationTree,
+        //                //        null,
+        //                //        RootProjectionMapping,
+        //                //        _newParameter.Type);
 
-                        //    foreach (var pathElement in _currentPath)
-                        //    {
-                        //        result = Expression.PropertyOrField(result, pathElement);
-                        //    }
+        //                //    foreach (var pathElement in _currentPath)
+        //                //    {
+        //                //        result = Expression.PropertyOrField(result, pathElement);
+        //                //    }
 
-                        //    newArgument = result;
-                        //}
+        //                //    newArgument = result;
+        //                //}
 
-                        newArguments.Add(newArgument);
-                        _currentPath.RemoveAt(_currentPath.Count - 1);
-                    }
+        //                newArguments.Add(newArgument);
+        //                _currentPath.RemoveAt(_currentPath.Count - 1);
+        //            }
 
-                    return Expression.New(newExpression.Constructor, newArguments, newExpression.Members);
-                }
+        //            return Expression.New(newExpression.Constructor, newArguments, newExpression.Members);
+        //        }
 
-                return newExpression;
-            }
+        //        return newExpression;
+        //    }
 
             
-            protected override Expression VisitExtension(Expression extensionExpression)
-            {
-                if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
-                {
-                    if (_bindingToSourceMapping.ContainsKey(navigationBindingExpression))
-                    {
-                        var newBinding = new NavigationBindingExpression2(
-                            _newParameter,
-                            _bindingToSourceMapping[navigationBindingExpression].NavigationTree,
-                            _bindingToSourceMapping[navigationBindingExpression].RootEntityType,
-                            _bindingToSourceMapping[navigationBindingExpression],
-                            navigationBindingExpression.Type);
+        //    protected override Expression VisitExtension(Expression extensionExpression)
+        //    {
+        //        if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+        //        {
+        //            if (_bindingToSourceMapping.ContainsKey(navigationBindingExpression))
+        //            {
+        //                var newBinding = new NavigationBindingExpression2(
+        //                    _newParameter,
+        //                    _bindingToSourceMapping[navigationBindingExpression].NavigationTree,
+        //                    _bindingToSourceMapping[navigationBindingExpression].RootEntityType,
+        //                    _bindingToSourceMapping[navigationBindingExpression],
+        //                    navigationBindingExpression.Type);
 
-                        return newBinding;
-                    }
-                    else
-                    {
-                        if (RootProjectionMapping == null)
-                        {
-                            RootProjectionMapping = new SourceMapping2
-                            {
-                                RootEntityType = null
-                            };
+        //                return newBinding;
+        //            }
+        //            else
+        //            {
+        //                if (RootProjectionMapping == null)
+        //                {
+        //                    RootProjectionMapping = new SourceMapping2
+        //                    {
+        //                        RootEntityType = null
+        //                    };
 
-                            RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
-                        }
+        //                    RootProjectionMapping.NavigationTree = NavigationTreeNode2.CreateRoot(RootProjectionMapping, new List<string>(), false);
+        //                }
 
-                        return new NavigationBindingExpression2(
-                            _newParameter,
-                            RootProjectionMapping.NavigationTree,
-                            null,
-                            RootProjectionMapping,
-                            _newParameter.Type);
-                    }
+        //                return new NavigationBindingExpression2(
+        //                    _newParameter,
+        //                    RootProjectionMapping.NavigationTree,
+        //                    null,
+        //                    RootProjectionMapping,
+        //                    _newParameter.Type);
+        //            }
 
-                    //return extensionExpression;
-                    //else
-                    //{
-                    //    var result = (Expression)_newParameter;
-                    //    foreach (var pathElement in _currentPath)
-                    //    {
-                    //        result = Expression.PropertyOrField(result, pathElement);
-                    //    }
+        //            //return extensionExpression;
+        //            //else
+        //            //{
+        //            //    var result = (Expression)_newParameter;
+        //            //    foreach (var pathElement in _currentPath)
+        //            //    {
+        //            //        result = Expression.PropertyOrField(result, pathElement);
+        //            //    }
 
-                    //    return result;
-                    //}
-                }
+        //            //    return result;
+        //            //}
+        //        }
 
-                throw new InvalidOperationException("Unhandled expression: " + extensionExpression);
-            }
+        //        throw new InvalidOperationException("Unhandled expression: " + extensionExpression);
+        //    }
 
-            protected override Expression VisitParameter(ParameterExpression parameterExpression)
-            {
-                return base.VisitParameter(parameterExpression);
-            }
+        //    protected override Expression VisitParameter(ParameterExpression parameterExpression)
+        //    {
+        //        return base.VisitParameter(parameterExpression);
+        //    }
 
-            // TODO: DRY
-            private Expression BuildAccessorExpression(Expression source, List<string> accessorPath)
-            {
-                var result = source;
+        //    // TODO: DRY
+        //    private Expression BuildAccessorExpression(Expression source, List<string> accessorPath)
+        //    {
+        //        var result = source;
 
-                if (accessorPath != null)
-                {
-                    foreach (var accessorPathElement in accessorPath)
-                    {
-                        // TODO: nasty hack, clean this up!!!!
-                        if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
-                        {
-                            result = Expression.Property(result, accessorPathElement);
-                        }
-                        else
-                        {
-                            result = Expression.Field(result, accessorPathElement);
-                        }
-                    }
-                }
+        //        if (accessorPath != null)
+        //        {
+        //            foreach (var accessorPathElement in accessorPath)
+        //            {
+        //                // TODO: nasty hack, clean this up!!!!
+        //                if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
+        //                {
+        //                    result = Expression.Property(result, accessorPathElement);
+        //                }
+        //                else
+        //                {
+        //                    result = Expression.Field(result, accessorPathElement);
+        //                }
+        //            }
+        //        }
 
-                return result;
-            }
-        }
+        //        return result;
+        //    }
+        //}
 
         //private Expression ProcessTerminatingOperation(MethodCallExpression methodCallExpression)
         //{
@@ -1088,7 +1133,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 sourceMapping.NavigationTree = navigationTreeRoot;
 
                 var pendingSelectorParameter = Expression.Parameter(entityType.ClrType);
-                //var pendingSelector = Expression.Lambda(pendingSelectorParameter, pendingSelectorParameter);
                 var pendingSelector = Expression.Lambda(
                     new NavigationBindingExpression2(
                         pendingSelectorParameter,
@@ -1205,7 +1249,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             SourceMapping2 sourceMapping2,
             NavigationTreeNode2 navigationTree2,
             NavigationExpansionExpressionState state,
-            //List<SourceMapping2> allSourceMappings,
             List<INavigation> navigationPath)
         {
             if (!navigationTree2.Expanded)
@@ -1476,7 +1519,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 PendingSelector = pendingSelector,
                 CurrentParameter = transparentIdentifierParameter,
-                //FinalProjectionPath = new List<string>(),
                 SourceMappings = outerState.SourceMappings.Concat(innerState.SourceMappings).ToList()
             };
 
@@ -1664,6 +1706,84 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             //};
 
             return (lambda, state);
+        }
+
+
+        private (LambdaExpression lambda, NavigationExpansionExpressionState state) RemapTwoArgumentResultSelector3(
+            LambdaExpression resultSelector,
+            NavigationExpansionExpressionState outerState,
+            NavigationExpansionExpressionState innerState)
+        {
+            var resultSelectorBody = resultSelector.Body;
+
+            var remappedResultSelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector2, resultSelector, resultSelector.Parameters[0]);
+            remappedResultSelector = ExpressionExtensions.CombineAndRemapLambdas(innerState.PendingSelector2, remappedResultSelector, remappedResultSelector.Parameters[1]);
+
+            var outerBinder = new NavigationPropertyBindingExpressionVisitor2(
+                outerState.CurrentParameter,
+                outerState.SourceMappings2);
+
+            var innerBinder = new NavigationPropertyBindingExpressionVisitor2(
+                innerState.CurrentParameter,
+                innerState.SourceMappings2);
+
+            var boundResultSelectorBody = outerBinder.Visit(remappedResultSelector.Body);
+            boundResultSelectorBody = innerBinder.Visit(boundResultSelectorBody);
+
+            outerState.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+            foreach (var outerSourceMapping in outerState.SourceMappings2)
+            {
+                foreach (var navigationTreeNode in outerSourceMapping.NavigationTree.Flatten())
+                {
+                    foreach (var fromMapping in navigationTreeNode.FromMappings)
+                    {
+                        fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                    }
+                }
+            }
+
+            innerState.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+            foreach (var innerSourceMapping in innerState.SourceMappings2)
+            {
+                foreach (var navigationTreeNode in innerSourceMapping.NavigationTree.Flatten())
+                {
+                    foreach (var fromMapping in navigationTreeNode.FromMappings)
+                    {
+                        fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                    }
+                }
+            }
+
+            var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(outerState.CurrentParameter.Type, innerState.CurrentParameter.Type);
+            var transparentIdentifierCtorInfo = resultType.GetTypeInfo().GetConstructors().Single();
+            var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
+
+            var newPendingSelectorBody = new ExpressionReplacingVisitor(outerState.CurrentParameter, transparentIdentifierParameter).Visit(boundResultSelectorBody);
+            newPendingSelectorBody = new ExpressionReplacingVisitor(innerState.CurrentParameter, transparentIdentifierParameter).Visit(newPendingSelectorBody);
+
+            // TODO:
+            // - create new transparent identifier
+            // - remap bound selector body in terms of that transparent identifier
+
+            var newState = new NavigationExpansionExpressionState
+            {
+                ApplyPendingSelector = true,
+                CurrentParameter = transparentIdentifierParameter,
+                CustomRootMapping = null, // TODO: need multiple here!!!
+                PendingSelector2 = null,
+                SourceMappings2 = outerState.SourceMappings2.Concat(innerState.SourceMappings2).ToList()
+            };
+
+
+            var lambda = Expression.Lambda(
+                Expression.New(transparentIdentifierCtorInfo, outerState.CurrentParameter, innerState.CurrentParameter),
+                outerState.CurrentParameter,
+                innerState.CurrentParameter);
+
+
+
+
+            return (null, null);
         }
 
         private class NavigationBindingTwoArgumentRemapper : NavigationExpansionExpressionVisitorBase
