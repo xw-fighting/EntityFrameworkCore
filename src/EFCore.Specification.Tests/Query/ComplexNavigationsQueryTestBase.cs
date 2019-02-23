@@ -5718,9 +5718,10 @@ namespace Microsoft.EntityFrameworkCore.Query
             using (var ctx = CreateContext())
             {
                 var query = ctx.LevelOne
-                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1, bar = new { name = l1.OneToOne_Optional_PK1.Name } })
+                    .Select(l1 => new { foo = l1.OneToOne_Optional_FK1, bar = new { nav = l1.OneToOne_Optional_PK1, name = l1.OneToOne_Optional_PK1.Name } })
                     .Distinct()
                     .Where(x => x.foo.OneToOne_Optional_PK2.Name != "Foo")
+                    .Where(x => x.bar.nav.OneToOne_Optional_PK2.Name != "Foo")
                     .Where(x => x.bar.name != "Bar");
 
                 var result = query.ToList();
@@ -5728,16 +5729,30 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         [ConditionalFact]
-        public virtual void Nav55()
+        public virtual void Nav5_5()
         {
             using (var ctx = CreateContext())
             {
                 var query = ctx.LevelOne
                     .Select(l1 => new { foo = l1.OneToOne_Optional_FK1 })
-                    //.Select(x => new { bar = x.foo })
                     .Select(x => new { baz = new { bar = x.foo.OneToOne_Optional_PK2 } })
                     .Distinct()
                     .Where(xxx => xxx.baz.bar.OneToOne_Required_PK3.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav5_6()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne
+                    .Select(l1 => l1.OneToOne_Optional_FK1)
+                    .Select(x => x.OneToOne_Optional_PK2)
+                    .Distinct()
+                    .Where(xxx => xxx.OneToOne_Required_PK3.Name != "Foo");
 
                 var result = query.ToList();
             }

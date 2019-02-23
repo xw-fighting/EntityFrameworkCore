@@ -85,4 +85,29 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             expressionPrinter.StringBuilder.Append(string.Join(", ", NavigationTreeNode.FromMappings.First()) + ")");
         }
     }
+
+    public class CustomRootExpression : Expression, IPrintable
+    {
+        public ParameterExpression RootParameter { get; }
+        public List<string> Mapping { get; }
+        public override ExpressionType NodeType => ExpressionType.Extension;
+        public override bool CanReduce => false;
+        public override Type Type { get; }
+
+        public CustomRootExpression(ParameterExpression rootParameter, List<string> mapping, Type type)
+        {
+            RootParameter = rootParameter;
+            Mapping = mapping;
+            Type = type;
+        }
+
+        public void Print([NotNull] ExpressionPrinter expressionPrinter)
+        {
+            expressionPrinter.StringBuilder.Append("CUSTOM_ROOT(");
+            expressionPrinter.Visit(RootParameter);
+            expressionPrinter.StringBuilder.Append(" | ");
+
+            expressionPrinter.StringBuilder.Append(string.Join(", ", Mapping) + ")");
+        }
+    }
 }

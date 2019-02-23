@@ -370,15 +370,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             var result = (Expression)root;
             foreach (var accessorPathElement in ToMapping)
             {
-                // TODO: nasty hack, clean this up!!!!
-                if (result.Type.GetProperties().Any(p => p.Name == accessorPathElement))
-                {
-                    result = Expression.Property(result, accessorPathElement);
-                }
-                else
-                {
-                    result = Expression.Field(result, accessorPathElement);
-                }
+                result = Expression.PropertyOrField(result, accessorPathElement);
             }
 
             return result;

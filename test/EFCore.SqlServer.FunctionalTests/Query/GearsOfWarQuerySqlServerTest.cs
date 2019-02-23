@@ -8196,6 +8196,75 @@ LEFT JOIN [Tags] AS [o.Tag] ON ([g].[Nickname] = [o.Tag].[GearNickName]) AND ([g
 WHERE (([g].[Discriminator] = N'Officer') AND (([g.Tag].[Note] <> N'Foo') OR [g.Tag].[Note] IS NULL)) AND (([o.Tag].[Note] <> N'Bar') OR [o.Tag].[Note] IS NULL)");
         }
 
+        public override void OfTypeNav3()
+        {
+            base.OfTypeNav3();
+
+            AssertSql(
+                @"SELECT [g].[Nickname], [g].[SquadId], [g].[AssignedCityName], [g].[CityOrBirthName], [g].[Discriminator], [g].[FullName], [g].[HasSoulPatch], [g].[LeaderNickname], [g].[LeaderSquadId], [g].[Rank]
+FROM [Gears] AS [g]
+LEFT JOIN [Tags] AS [g.Tag] ON ([g].[Nickname] = [g.Tag].[GearNickName]) AND ([g].[SquadId] = [g.Tag].[GearSquadId])
+INNER JOIN [Weapons] AS [w] ON [g].[FullName] = [w].[OwnerFullName]
+LEFT JOIN [Tags] AS [o.Tag] ON ([g].[Nickname] = [o.Tag].[GearNickName]) AND ([g].[SquadId] = [o.Tag].[GearSquadId])
+WHERE (([g].[Discriminator] = N'Officer') AND (([g.Tag].[Note] <> N'Foo') OR [g.Tag].[Note] IS NULL)) AND (([o.Tag].[Note] <> N'Bar') OR [o.Tag].[Note] IS NULL)");
+        }
+
+        public override void Nav_rewrite_Distinct_with_convert()
+        {
+            base.Nav_rewrite_Distinct_with_convert();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_rewrite_with_convert1()
+        {
+            base.Nav_rewrite_with_convert1();
+
+            AssertSql(
+                @"SELECT [t].[Name], [t].[Discriminator], [t].[LocustHordeId], [t].[ThreatLevel], [t].[DefeatedByNickname], [t].[DefeatedBySquadId], [t].[HighCommandId]
+FROM [Factions] AS [f]
+LEFT JOIN [Cities] AS [f.Capital] ON [f].[CapitalName] = [f.Capital].[Name]
+LEFT JOIN (
+    SELECT [f.Capital.Commander].*
+    FROM [LocustLeaders] AS [f.Capital.Commander]
+    WHERE [f.Capital.Commander].[Discriminator] = N'LocustCommander'
+) AS [t] ON ([f].[Discriminator] = N'LocustHorde') AND ([f].[CommanderName] = [t].[Name])
+WHERE ([f].[Discriminator] = N'LocustHorde') AND (([f.Capital].[Name] <> N'Foo') OR [f.Capital].[Name] IS NULL)");
+        }
+
+        public override void Nav_rewrite_with_convert2()
+        {
+            base.Nav_rewrite_with_convert2();
+
+            AssertSql(
+                @"SELECT [f].[Id], [f].[CapitalName], [f].[Discriminator], [f].[Name], [f].[CommanderName], [f].[Eradicated]
+FROM [Factions] AS [f]
+LEFT JOIN [Cities] AS [f.Capital] ON [f].[CapitalName] = [f.Capital].[Name]
+LEFT JOIN (
+    SELECT [f.Capital.Commander].*
+    FROM [LocustLeaders] AS [f.Capital.Commander]
+    WHERE [f.Capital.Commander].[Discriminator] = N'LocustCommander'
+) AS [t] ON ([f].[Discriminator] = N'LocustHorde') AND ([f].[CommanderName] = [t].[Name])
+WHERE (([f].[Discriminator] = N'LocustHorde') AND (([f.Capital].[Name] <> N'Foo') OR [f.Capital].[Name] IS NULL)) AND (([t].[Name] <> N'Bar') OR [t].[Name] IS NULL)");
+        }
+
+        public override void Nav_rewrite_with_convert3()
+        {
+            base.Nav_rewrite_with_convert3();
+
+            AssertSql(
+                @"SELECT [f].[Id], [f].[CapitalName], [f].[Discriminator], [f].[Name], [f].[CommanderName], [f].[Eradicated]
+FROM [Factions] AS [f]
+LEFT JOIN [Cities] AS [f.Capital] ON [f].[CapitalName] = [f.Capital].[Name]
+LEFT JOIN (
+    SELECT [f.Capital.Commander].*
+    FROM [LocustLeaders] AS [f.Capital.Commander]
+    WHERE [f.Capital.Commander].[Discriminator] = N'LocustCommander'
+) AS [t] ON ([f].[Discriminator] = N'LocustHorde') AND ([f].[CommanderName] = [t].[Name])
+WHERE (([f].[Discriminator] = N'LocustHorde') AND (([f.Capital].[Name] <> N'Foo') OR [f.Capital].[Name] IS NULL)) AND (([t].[Name] <> N'Bar') OR [t].[Name] IS NULL)");
+        }
+
         private void AssertSql(params string[] expected)
             => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 

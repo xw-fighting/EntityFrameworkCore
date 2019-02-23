@@ -29,6 +29,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 return navigationBindingExpression;
             }
 
+            if (extensionExpression is CustomRootExpression customRootExpression)
+            {
+                return customRootExpression;
+            }
+
             return base.VisitExtension(extensionExpression);
         }
 
@@ -639,7 +644,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 if (state.ApplyPendingSelector)
                 {
-                    var newSelectorBody = new NavigationPropertyUnbindingBindingExpressionVisitor2(state.CurrentParameter).Visit(state.PendingSelector2.Body);
+                    var unbinder = new NavigationPropertyUnbindingBindingExpressionVisitor2(state.CurrentParameter);
+                    var newSelectorBody = unbinder.Visit(state.PendingSelector2.Body);
 
                     // TODO: test cases with casts, e.g. orders.Select(o => new { foo = (VipCustomer)o.Customer }).Distinct()
                     var entityTypeOverride = methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType)
@@ -649,7 +655,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     var pssmg = new PendingSelectorSourceMappingGenerator(state.PendingSelector2.Parameters[0], entityTypeOverride);
                     pssmg.Visit(state.PendingSelector2);
 
-                    state.SourceMappings2 = pssmg.SourceMappings;
+                    //state.SourceMappings2 = pssmg.SourceMappings;
 
                     var selectorMethodInfo = QueryableSelectMethodInfo.MakeGenericMethod(
                         state.CurrentParameter.Type,
@@ -661,16 +667,38 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         Expression.Lambda(newSelectorBody, state.CurrentParameter));
 
                     var newPendingSelectorParameter = Expression.Parameter(newSelectorBody.Type);
-                    var psg = new PendingSelectorGenerator(
-                        state.PendingSelector2.Parameters[0],
-                        newPendingSelectorParameter,
-                        pssmg.BindingToSourceMapping);
+                    //var psg = new PendingSelectorGenerator(
+                    //    state.PendingSelector2.Parameters[0],
+                    //    newPendingSelectorParameter,
+                    //    pssmg.BindingToSourceMapping);
 
-                    state.PendingSelector2 = Expression.Lambda(newPendingSelectorParameter, newPendingSelectorParameter);
+                    var customRootMapping = new List<string>();
+
+                    // if the top level was navigation binding, then we are guaranteed to have exactly one source mapping in for the new pending selector
+                    var newPendingSelectorBody = state.PendingSelector2.Body is NavigationBindingExpression2 binding
+                        ? (Expression)new NavigationBindingExpression2(
+                            newPendingSelectorParameter,
+                            pssmg.BindingToSourceMapping[binding].NavigationTree,
+                            pssmg.BindingToSourceMapping[binding].RootEntityType,
+                            pssmg.BindingToSourceMapping[binding],
+                            newPendingSelectorParameter.Type)
+                        : new CustomRootExpression(newPendingSelectorParameter, customRootMapping, newPendingSelectorParameter.Type);
+
+                    // TODO: only apply custom root mapping for parameters that are not root!
+                    state = new NavigationExpansionExpressionState
+                    {
+                        ApplyPendingSelector = false,
+                        CurrentParameter = newPendingSelectorParameter,
+                        CustomRootMapping = customRootMapping,
+                        PendingSelector2 = Expression.Lambda(newPendingSelectorBody, newPendingSelectorParameter),
+                        SourceMappings2 = pssmg.SourceMappings
+                    };
+
+                    //state.PendingSelector2 = Expression.Lambda(newPendingSelectorParameter, newPendingSelectorParameter);
 
                     //state.PendingSelector2 = (LambdaExpression)psg.Visit(state.PendingSelector2);
-                    state.ApplyPendingSelector = false;
-                    state.CurrentParameter = newPendingSelectorParameter;
+                    //state.ApplyPendingSelector = false;
+                    //state.CurrentParameter = newPendingSelectorParameter;
 
                     // TODO: hack!!!
                     //if (psg.RootProjectionMapping != null)
@@ -1060,6 +1088,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 sourceMapping.NavigationTree = navigationTreeRoot;
 
                 var pendingSelectorParameter = Expression.Parameter(entityType.ClrType);
+                //var pendingSelector = Expression.Lambda(pendingSelectorParameter, pendingSelectorParameter);
                 var pendingSelector = Expression.Lambda(
                     new NavigationBindingExpression2(
                         pendingSelectorParameter,
@@ -1073,6 +1102,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     constantExpression,
                     new NavigationExpansionExpressionState
                     {
+                        CustomRootMapping = new List<string>(),
                         SourceMappings = new List<SourceMapping>
                         {
                             new SourceMapping
@@ -1129,8 +1159,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             result.source,
                             result.parameter,
                             sourceMapping,
-                            state.SourceMappings2,
                             navigationTree,
+                            state,
                             new List<INavigation>());
                     }
 
@@ -1149,6 +1179,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var newState = new NavigationExpansionExpressionState
             {
                 CurrentParameter = result.parameter,
+                CustomRootMapping = state.CustomRootMapping,
                 SourceMappings = state.SourceMappings,
                 SourceMappings2 = state.SourceMappings2,
                 PendingSelector2 = pendingSelector,
@@ -1172,8 +1203,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             Expression sourceExpression,
             ParameterExpression parameterExpression,
             SourceMapping2 sourceMapping2,
-            List<SourceMapping2> allSourceMappings,
             NavigationTreeNode2 navigationTree2,
+            NavigationExpansionExpressionState state,
+            //List<SourceMapping2> allSourceMappings,
             List<INavigation> navigationPath)
         {
             if (!navigationTree2.Expanded)
@@ -1339,7 +1371,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 // remap navigation 'To' paths -> for this navigation prepend "Inner", for every other (already expanded) navigation prepend "Outer"
                 navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
-                foreach (var sourceMapping in allSourceMappings)
+                foreach (var sourceMapping in state.SourceMappings2)
                 {
                     foreach (var navigationTreeNode in sourceMapping.NavigationTree.Flatten().Where(n => n.Expanded && n != navigationTree2))
                     {
@@ -1349,6 +1381,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
                         }
                     }
+                }
+
+                state.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                if (navigationTree2.Optional)
+                {
+                    state.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
                 }
 
                 navigationTree2.Expanded = true;
@@ -1366,8 +1404,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     result.source,
                     result.parameter,
                     sourceMapping2,
-                    allSourceMappings,
                     child,
+                    state,
                     navigationPath.ToList());
             }
 
@@ -2067,6 +2105,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                             navigationBindingExpression.SourceMapping,
                             navigationBindingExpression.Type)
                         : navigationBindingExpression;
+                }
+
+                if (extensionExpression is CustomRootExpression customRootExpression)
+                {
+                    var newRootParameter = (ParameterExpression)Visit(customRootExpression.RootParameter);
+
+                    return newRootParameter != customRootExpression.RootParameter
+                        ? new CustomRootExpression(newRootParameter, customRootExpression.Mapping, customRootExpression.Type)
+                        : customRootExpression;
                 }
 
                 throw new InvalidOperationException("Unhandled extension expression: " + extensionExpression);

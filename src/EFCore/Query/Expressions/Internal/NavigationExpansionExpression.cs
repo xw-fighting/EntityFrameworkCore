@@ -40,6 +40,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public LambdaExpression PendingSelector { get; set; }
         public LambdaExpression PendingSelector2 { get; set; }
         public bool ApplyPendingSelector { get; set; }
+        public List<string> CustomRootMapping { get; set; }
     }
 
     public class NavigationExpansionExpression : Expression, IPrintable
@@ -71,13 +72,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
 
-            // final navigation rewrite
-            // TODO: do this somewhere else? (so that Reduce method is not so complex)
-            var nrev2 = new NavigationReplacingExpressionVisitor2(
-                State.PendingSelector2.Parameters[0],
-                State.CurrentParameter);
-
-            var pendingSelector = (LambdaExpression)nrev2.Visit(State.PendingSelector2);
+            var unbinder = new NavigationPropertyUnbindingBindingExpressionVisitor2(State.CurrentParameter);
+            var pendingSelector = (LambdaExpression)unbinder.Visit(State.PendingSelector2);
 
             var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
                 ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)

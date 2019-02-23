@@ -733,7 +733,16 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 _stringBuilder.IncrementIndent();
             }
 
-            VisitArguments(newExpression.Arguments, appendAction);
+            for (var i = 0; i < newExpression.Arguments.Count; i++)
+            {
+                if (newExpression.Members != null)
+                {
+                    Append(newExpression.Members[i].Name + " = ");
+                }
+
+                Visit(newExpression.Arguments[i]);
+                appendAction(i == newExpression.Arguments.Count - 1 ? "" : ", ");
+            }
 
             if (isComplex)
             {

@@ -251,6 +251,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 return navigationBindingExpression;
             }
 
+            if (extensionExpression is CustomRootExpression customRootExpression)
+            {
+                return customRootExpression;
+            }
+
             return base.VisitExtension(extensionExpression);
         }
 
@@ -281,6 +286,29 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             }
 
             return parameterExpression;
+        }
+
+        protected override Expression VisitUnary(UnaryExpression unaryExpression)
+        {
+            if (unaryExpression.NodeType == ExpressionType.Convert)
+            {
+                var newOperand = Visit(unaryExpression.Operand);
+                if (newOperand is NavigationBindingExpression2 navigationBindingExpression)
+                {
+                    var newEntityType = navigationBindingExpression.EntityType.GetDerivedTypes().Where(dt => dt.ClrType == unaryExpression.Type).Single();
+
+                    return new NavigationBindingExpression2
+                        (navigationBindingExpression.RootParameter,
+                        navigationBindingExpression.NavigationTreeNode,
+                        newEntityType,
+                        navigationBindingExpression.SourceMapping,
+                        unaryExpression.Type);
+                }
+
+                return unaryExpression.Update(newOperand);
+            }
+
+            return base.VisitUnary(unaryExpression);
         }
 
         protected override Expression VisitMember(MemberExpression memberExpression)
@@ -356,12 +384,22 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             List<(NavigationTreeNode2 navigationTreeNode, List<string> path)> navigationTreeNodeCandidates)
         {
             if (expression is ParameterExpression parameterExpression
-                && (parameterExpression == _rootParameter/* || _rootParameter == null*/))
+                && (parameterExpression == _rootParameter))
             {
                 var matchingCandidate = navigationTreeNodeCandidates.Where(m => m.path.Count == 0).SingleOrDefault();
 
                 return matchingCandidate.navigationTreeNode != null
                     ? (rootParameter: parameterExpression, matchingCandidate.navigationTreeNode)
+                    : (null, null);
+            }
+
+            if (expression is CustomRootExpression customRootExpression
+                && customRootExpression.RootParameter == _rootParameter)
+            {
+                var matchingCandidate = navigationTreeNodeCandidates.Where(m => m.path.Count == 0).SingleOrDefault();
+
+                return matchingCandidate.navigationTreeNode != null
+                    ? (rootParameter: customRootExpression.RootParameter, matchingCandidate.navigationTreeNode)
                     : (null, null);
             }
 
@@ -409,15 +447,31 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression
                 && navigationBindingExpression.RootParameter == _rootParameter)
             {
-                return navigationBindingExpression.NavigationTreeNode.BuildExpression(navigationBindingExpression.RootParameter);
+                var result = navigationBindingExpression.NavigationTreeNode.BuildExpression(navigationBindingExpression.RootParameter);
+
+                return result.Type != navigationBindingExpression.Type
+                    ? Expression.Convert(result, navigationBindingExpression.Type)
+                    : result;
+            }
+
+            if (extensionExpression is CustomRootExpression customRootExpression
+                && customRootExpression.RootParameter == _rootParameter)
+            {
+                var result = (Expression)_rootParameter;
+                // TODO: DRY - logic copied from NavigationTreeNode - is there better common place for this?
+                foreach (var accessorPathElement in customRootExpression.Mapping)
+                {
+                    result = Expression.PropertyOrField(result, accessorPathElement);
+                }
+
+                return result.Type != customRootExpression.Type
+                    ? Expression.Convert(result, customRootExpression.Type)
+                    : result;
             }
 
             return base.VisitExtension(extensionExpression);
         }
     }
-
-
-
 
     //public class NavigationPropertyReverseBindingExpressionVisitor2 : NavigationExpansionExpressionVisitorBase
     //{
