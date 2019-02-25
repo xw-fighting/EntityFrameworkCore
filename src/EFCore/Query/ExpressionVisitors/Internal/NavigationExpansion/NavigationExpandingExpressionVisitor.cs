@@ -526,11 +526,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
             {
                 innerSource = innerNavigationExpansionExpression.Operand;
-                innerState = AdjustState2(outerState, innerNavigationExpansionExpression);
+                innerState = AdjustState2(innerState, innerNavigationExpansionExpression);
             }
 
             var outerResult = FindAndApplyNavigations(outerSource, outerKeySelector, outerState);
             var innerResult = FindAndApplyNavigations(innerSource, innerKeySelector, innerState);
+
+            var newOuterKeySelectorBody = new NavigationPropertyUnbindingBindingExpressionVisitor2(outerResult.state.CurrentParameter).Visit(outerResult.lambdaBody);
+            var newInnerKeySelectorBody = new NavigationPropertyUnbindingBindingExpressionVisitor2(innerResult.state.CurrentParameter).Visit(innerResult.lambdaBody);
 
             var resultSelectorRemap = RemapTwoArgumentResultSelector3(resultSelector, outerResult.state, innerResult.state);
 
@@ -544,12 +547,21 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 newMethodInfo,
                 outerResult.source,
                 innerResult.source,
-                Expression.Lambda(outerResult.lambdaBody, outerResult.state.CurrentParameter),
-                Expression.Lambda(innerResult.lambdaBody, innerResult.state.CurrentParameter),
+                Expression.Lambda(newOuterKeySelectorBody, outerResult.state.CurrentParameter),
+                Expression.Lambda(newInnerKeySelectorBody, innerResult.state.CurrentParameter),
                 Expression.Lambda(resultSelectorRemap.lambda.Body, outerResult.state.CurrentParameter, innerResult.state.CurrentParameter));
 
-            var result = FindAndApplyNavigations(rewritten, resultSelectorRemap.state.PendingSelector2, resultSelectorRemap.state);
-            resultSelectorRemap.state.PendingSelector2 = Expression.Lambda(result.lambdaBody, result.state.CurrentParameter);
+            // TODO: need to expand navigations on result selector, probably need to happen as part of RemapTwoArgumentResultSelector3, before we update pending selector with the new lambda
+
+            var pendingSelector = resultSelectorRemap.state.PendingSelector2;
+            resultSelectorRemap.state.PendingSelector2 = Expression.Lambda(resultSelectorRemap.state.PendingSelector2.Parameters[0], resultSelectorRemap.state.PendingSelector2.Parameters[0]);
+
+            //var unbinder = new NavigationPropertyUnbindingBindingExpressionVisitor2(resultSelectorRemap.state.CurrentParameter);
+            //var fubar = unbinder.Visit(resultSelectorRemap.state.PendingSelector2.Body);
+
+            var result = FindAndApplyNavigations(rewritten, /*resultSelectorRemap.state.PendingSelector2*/pendingSelector, resultSelectorRemap.state);
+
+            result.state.PendingSelector2 = Expression.Lambda(result.lambdaBody, result.state.CurrentParameter);
 
             return new NavigationExpansionExpression(
                 result.source,
@@ -745,8 +757,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     state = new NavigationExpansionExpressionState
                     {
                         ApplyPendingSelector = false,
+                        CustomRootMappings = new List<List<string>> { customRootMapping },
                         CurrentParameter = newPendingSelectorParameter,
-                        CustomRootMapping = customRootMapping,
                         PendingSelector2 = Expression.Lambda(newPendingSelectorBody, newPendingSelectorParameter),
                         SourceMappings2 = pssmg.SourceMappings
                     };
@@ -1146,7 +1158,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     constantExpression,
                     new NavigationExpansionExpressionState
                     {
-                        CustomRootMapping = new List<string>(),
+                        CustomRootMappings = new List<List<string>> { new List<string>() },
                         SourceMappings = new List<SourceMapping>
                         {
                             new SourceMapping
@@ -1223,7 +1235,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var newState = new NavigationExpansionExpressionState
             {
                 CurrentParameter = result.parameter,
-                CustomRootMapping = state.CustomRootMapping,
+                CustomRootMappings = state.CustomRootMappings,
                 SourceMappings = state.SourceMappings,
                 SourceMappings2 = state.SourceMappings2,
                 PendingSelector2 = pendingSelector,
@@ -1426,10 +1438,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     }
                 }
 
-                state.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                if (navigationTree2.Optional)
+                foreach (var customRootMapping in state.CustomRootMappings)
                 {
-                    state.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                    customRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                    if (navigationTree2.Optional)
+                    {
+                        customRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                    }
                 }
 
                 navigationTree2.Expanded = true;
@@ -1730,11 +1745,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var boundResultSelectorBody = outerBinder.Visit(remappedResultSelector.Body);
             boundResultSelectorBody = innerBinder.Visit(boundResultSelectorBody);
 
-            outerState.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+            foreach (var outerCustomRootMapping in outerState.CustomRootMappings)
+            {
+                outerCustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+            }
+
             foreach (var outerSourceMapping in outerState.SourceMappings2)
             {
                 foreach (var navigationTreeNode in outerSourceMapping.NavigationTree.Flatten())
                 {
+                    navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
                     foreach (var fromMapping in navigationTreeNode.FromMappings)
                     {
                         fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
@@ -1742,11 +1762,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 }
             }
 
-            innerState.CustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+            foreach (var innerCustomRootMapping in innerState.CustomRootMappings)
+            {
+                innerCustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+            }
+
             foreach (var innerSourceMapping in innerState.SourceMappings2)
             {
                 foreach (var navigationTreeNode in innerSourceMapping.NavigationTree.Flatten())
                 {
+                    navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
                     foreach (var fromMapping in navigationTreeNode.FromMappings)
                     {
                         fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
@@ -1769,21 +1794,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 ApplyPendingSelector = true,
                 CurrentParameter = transparentIdentifierParameter,
-                CustomRootMapping = null, // TODO: need multiple here!!!
-                PendingSelector2 = null,
+                CustomRootMappings = outerState.CustomRootMappings.Concat(innerState.CustomRootMappings).ToList(),
+                PendingSelector2 = Expression.Lambda(newPendingSelectorBody, transparentIdentifierParameter),
                 SourceMappings2 = outerState.SourceMappings2.Concat(innerState.SourceMappings2).ToList()
             };
-
 
             var lambda = Expression.Lambda(
                 Expression.New(transparentIdentifierCtorInfo, outerState.CurrentParameter, innerState.CurrentParameter),
                 outerState.CurrentParameter,
                 innerState.CurrentParameter);
 
-
-
-
-            return (null, null);
+            return (lambda, state: newState);
         }
 
         private class NavigationBindingTwoArgumentRemapper : NavigationExpansionExpressionVisitorBase

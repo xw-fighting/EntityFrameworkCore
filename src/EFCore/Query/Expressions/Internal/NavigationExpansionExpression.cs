@@ -40,7 +40,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public LambdaExpression PendingSelector { get; set; }
         public LambdaExpression PendingSelector2 { get; set; }
         public bool ApplyPendingSelector { get; set; }
-        public List<string> CustomRootMapping { get; set; }
+        public List<List<string>> CustomRootMappings { get; set; } = new List<List<string>>();
     }
 
     public class NavigationExpansionExpression : Expression, IPrintable
