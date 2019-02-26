@@ -143,30 +143,25 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
                     var caller = navigationBindingExpression2.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression2.RootParameter);
+                    navigationBindingExpression2.NavigationTreeNode.Parent.Children.Remove(navigationBindingExpression2.NavigationTreeNode);
 
-                    // TODO: this could be other things too: EF.Property and maybe field
+                    //TODO: this could be other things too: EF.Property and maybe field
                     var outerBinding = new NavigationBindingExpression2(
-                        navigationBindingExpression2.RootParameter,
-                        navigationBindingExpression2.NavigationTreeNode.Parent,
-                        navigationBindingExpression2.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression2.SourceMapping.RootEntityType,
-                        navigationBindingExpression2.SourceMapping,
-                        caller.Type);
-
-
-
-
-                    //var newNavigations = navigationBindingExpression2.Navigations.Take(navigationBindingExpression.Navigations.Count - 1).ToList();
-                    //var outerBinding = new NavigationBindingExpression(
-                    //    caller,
-                    //    //((MemberExpression)navigationBindingExpression.Operand).Expression,
-                    //    navigationBindingExpression.RootParameter,
-                    //    newNavigations,
-                    //    newNavigations.LastOrDefault()?.GetTargetType() ?? lastNavigation.DeclaringEntityType,
-                    //    navigationBindingExpression.SourceMapping);
+                    navigationBindingExpression2.RootParameter,
+                    navigationBindingExpression2.NavigationTreeNode.Parent,
+                    navigationBindingExpression2.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression2.SourceMapping.RootEntityType,
+                    navigationBindingExpression2.SourceMapping,
+                    lastNavigation.DeclaringEntityType.ClrType); //caller.Type);
 
                     var outerKeyAccess = CreateKeyAccessExpression(
                         outerBinding,
                         lastNavigation.ForeignKey.PrincipalKey.Properties);
+
+                    //var outerSource = navigationBindingExpression2.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression2.RootParameter);
+
+                    //var outerKeyAccess = CreateKeyAccessExpression(
+                    //    outerSource,
+                    //    lastNavigation.ForeignKey.PrincipalKey.Properties);
 
                     var innerParameter = Expression.Parameter(collectionNavigationElementType, collectionNavigationElementType.GenerateParameterName());
                     var innerKeyAccess = CreateKeyAccessExpression(
@@ -177,7 +172,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                             outerKeyAccess,
                             innerKeyAccess,
-                            outerBinding,
+                            outerBinding,//outerSource
                             navigationBindingExpression2.RootParameter,
                             // TODO: this is hacky
                             navigationBindingExpression2.NavigationTreeNode.NavigationChain()),

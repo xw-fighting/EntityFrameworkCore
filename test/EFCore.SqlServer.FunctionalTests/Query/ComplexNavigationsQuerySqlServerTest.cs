@@ -4329,7 +4329,11 @@ LEFT JOIN [LevelTwo] AS [l.OneToOne_Optional_FK1] ON [l].[Id] = [l.OneToOne_Opti
             base.SelectMany1();
 
             AssertSql(
-                @"");
+                @"SELECT [e].[Id], [e].[Date], [e].[Name], [e].[OneToMany_Optional_Self_Inverse1Id], [e].[OneToMany_Required_Self_Inverse1Id], [e].[OneToOne_Optional_Self1Id], [x].[Id], [x].[Date], [x].[Level1_Optional_Id], [x].[Level1_Required_Id], [x].[Name], [x].[OneToMany_Optional_Inverse2Id], [x].[OneToMany_Optional_Self_Inverse2Id], [x].[OneToMany_Required_Inverse2Id], [x].[OneToMany_Required_Self_Inverse2Id], [x].[OneToOne_Optional_PK_Inverse2Id], [x].[OneToOne_Optional_Self2Id]
+FROM [LevelOne] AS [e]
+LEFT JOIN [LevelTwo] AS [e.OneToOne_Optional_FK1] ON [e].[Id] = [e.OneToOne_Optional_FK1].[Level1_Optional_Id]
+CROSS JOIN [LevelTwo] AS [x]
+WHERE ([e.OneToOne_Optional_FK1].[Name] <> N'Foo') OR [e.OneToOne_Optional_FK1].[Name] IS NULL");
         }
 
         public override void SelectMany2()
@@ -4345,7 +4349,14 @@ LEFT JOIN [LevelTwo] AS [l.OneToOne_Optional_FK1] ON [l].[Id] = [l.OneToOne_Opti
             base.SelectMany3();
 
             AssertSql(
-                @"");
+                @"SELECT [t].[Id], [t].[Date], [t].[Level1_Optional_Id], [t].[Level1_Required_Id], [t].[Name], [t].[OneToMany_Optional_Inverse2Id], [t].[OneToMany_Optional_Self_Inverse2Id], [t].[OneToMany_Required_Inverse2Id], [t].[OneToMany_Required_Self_Inverse2Id], [t].[OneToOne_Optional_PK_Inverse2Id], [t].[OneToOne_Optional_Self2Id]
+FROM [LevelOne] AS [e]
+LEFT JOIN [LevelTwo] AS [e.OneToOne_Optional_FK1] ON [e].[Id] = [e.OneToOne_Optional_FK1].[Level1_Optional_Id]
+INNER JOIN (
+    SELECT [l].[Id], [l].[Date], [l].[Level1_Optional_Id], [l].[Level1_Required_Id], [l].[Name], [l].[OneToMany_Optional_Inverse2Id], [l].[OneToMany_Optional_Self_Inverse2Id], [l].[OneToMany_Required_Inverse2Id], [l].[OneToMany_Required_Self_Inverse2Id], [l].[OneToOne_Optional_PK_Inverse2Id], [l].[OneToOne_Optional_Self2Id]
+    FROM [LevelTwo] AS [l]
+) AS [t] ON [e].[Id] = [t].[OneToMany_Optional_Inverse2Id]
+WHERE ([e.OneToOne_Optional_FK1].[Name] <> N'Foo') OR [e.OneToOne_Optional_FK1].[Name] IS NULL");
         }
 
         public override void SelectMany4()
@@ -4361,7 +4372,15 @@ LEFT JOIN [LevelTwo] AS [l.OneToOne_Optional_FK1] ON [l].[Id] = [l.OneToOne_Opti
             base.SelectMany5();
 
             AssertSql(
-                @"");
+                @"SELECT [t].[Id], [t].[Level2_Optional_Id], [t].[Level2_Required_Id], [t].[Name], [t].[OneToMany_Optional_Inverse3Id], [t].[OneToMany_Optional_Self_Inverse3Id], [t].[OneToMany_Required_Inverse3Id], [t].[OneToMany_Required_Self_Inverse3Id], [t].[OneToOne_Optional_PK_Inverse3Id], [t].[OneToOne_Optional_Self3Id]
+FROM [LevelOne] AS [e]
+LEFT JOIN [LevelTwo] AS [e.OneToOne_Optional_FK1] ON [e].[Id] = [e.OneToOne_Optional_FK1].[Level1_Optional_Id]
+LEFT JOIN [LevelTwo] AS [e.OneToOne_Optional_FK1.OneToOne_Optional_PK1] ON [e].[Id] = [e.OneToOne_Optional_FK1.OneToOne_Optional_PK1].[OneToOne_Optional_PK_Inverse2Id]
+INNER JOIN (
+    SELECT [l].[Id], [l].[Level2_Optional_Id], [l].[Level2_Required_Id], [l].[Name], [l].[OneToMany_Optional_Inverse3Id], [l].[OneToMany_Optional_Self_Inverse3Id], [l].[OneToMany_Required_Inverse3Id], [l].[OneToMany_Required_Self_Inverse3Id], [l].[OneToOne_Optional_PK_Inverse3Id], [l].[OneToOne_Optional_Self3Id]
+    FROM [LevelThree] AS [l]
+) AS [t] ON [e.OneToOne_Optional_FK1.OneToOne_Optional_PK1].[Id] = [t].[OneToMany_Optional_Inverse3Id]
+WHERE ([e.OneToOne_Optional_FK1].[Name] <> N'Foo') OR [e.OneToOne_Optional_FK1].[Name] IS NULL");
         }
 
         public override void SelectMany6()
