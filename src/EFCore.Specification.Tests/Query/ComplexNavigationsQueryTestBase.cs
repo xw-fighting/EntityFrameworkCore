@@ -5874,8 +5874,6 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
-
-
         [ConditionalFact]
         public virtual void SelectMany1()
         {
@@ -5936,6 +5934,28 @@ namespace Microsoft.EntityFrameworkCore.Query
                 var result = query.ToList();
             }
         }
+
+        [ConditionalFact]
+        public virtual void SelectMany7()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => ctx.LevelTwo, (o, i) => new { o.OneToOne_Required_PK1, i.OneToOne_Required_PK2 });
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void SelectMany8()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Where(e => e.OneToOne_Optional_FK1.Name != "Foo").SelectMany(x => ctx.LevelTwo, (o, i) => new { o.OneToMany_Required1, i.OneToMany_Optional2 });
+                var result = query.ToList();
+            }
+        }
+
+        // todo: navigations in result selector for select many *and* join
 
         [ConditionalFact]
         public virtual void Join1()

@@ -45,26 +45,26 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     : customRootExpression;
             }
 
-            if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
-            {
-                var newRootParameter = navigationBindingExpression.RootParameter;
-                var newRootParameterVisitResult = Visit(navigationBindingExpression.RootParameter);
-                if (newRootParameterVisitResult is NavigationBindingExpression nbe)
-                {
-                    newRootParameter = nbe.RootParameter;
-                }
+            //if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
+            //{
+            //    var newRootParameter = navigationBindingExpression.RootParameter;
+            //    var newRootParameterVisitResult = Visit(navigationBindingExpression.RootParameter);
+            //    if (newRootParameterVisitResult is NavigationBindingExpression nbe)
+            //    {
+            //        newRootParameter = nbe.RootParameter;
+            //    }
 
-                var newOperand = Visit(navigationBindingExpression.Operand);
+            //    var newOperand = Visit(navigationBindingExpression.Operand);
 
-                return newRootParameter != navigationBindingExpression.RootParameter || newOperand != navigationBindingExpression.Operand
-                    ? new NavigationBindingExpression(
-                        newOperand,
-                        newRootParameter,
-                        navigationBindingExpression.Navigations.ToList(),
-                        navigationBindingExpression.EntityType,
-                        navigationBindingExpression.SourceMapping)
-                    : navigationBindingExpression;
-            }
+            //    return newRootParameter != navigationBindingExpression.RootParameter || newOperand != navigationBindingExpression.Operand
+            //        ? new NavigationBindingExpression(
+            //            newOperand,
+            //            newRootParameter,
+            //            navigationBindingExpression.Navigations.ToList(),
+            //            navigationBindingExpression.EntityType,
+            //            navigationBindingExpression.SourceMapping)
+            //        : navigationBindingExpression;
+            //}
 
             if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
             {

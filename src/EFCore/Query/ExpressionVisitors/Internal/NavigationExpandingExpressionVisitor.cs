@@ -302,7 +302,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public List<string> ToMapping { get; set; }// = new List<string>();
 
         public static NavigationTreeNode2 CreateRoot(
-            [NotNull] SourceMapping2 sourceMapping,
+            [NotNull] SourceMapping sourceMapping,
             [NotNull] List<string> fromMapping,
             bool optional)
         {
@@ -313,7 +313,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         }
 
         public static NavigationTreeNode2 Create(
-            [NotNull]SourceMapping2 sourceMapping,
+            [NotNull] SourceMapping sourceMapping,
             [NotNull] INavigation navigation,
             [NotNull] NavigationTreeNode2 parent)
         {

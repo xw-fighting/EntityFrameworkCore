@@ -38,6 +38,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         protected MethodInfo QueryableCountPredicateMethodInfo { get; set; }
         protected MethodInfo QueryableDistinctMethodInfo { get; set; }
         protected MethodInfo QueryableTakeMethodInfo { get; set; }
+        protected MethodInfo QueryableSkipMethodInfo { get; set; }
 
         protected MethodInfo QueryableOfType { get; set; }
 
@@ -85,6 +86,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             QueryableDistinctMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Distinct) && m.GetParameters().Count() == 1).Single();
             QueryableTakeMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Take) && m.GetParameters().Count() == 2).Single();
+            QueryableSkipMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Skip) && m.GetParameters().Count() == 2).Single();
 
             QueryableAny = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 1).Single();
             QueryableAnyPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 2).Single();

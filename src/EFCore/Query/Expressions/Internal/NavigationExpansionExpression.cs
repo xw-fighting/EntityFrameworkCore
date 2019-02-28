@@ -17,16 +17,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 {
     public class SourceMapping
     {
-        public List<string> InitialPath { get; set; } = new List<string>();
-        public IEntityType RootEntityType { get; set; }
-        public List<NavigationTreeNode> FoundNavigations { get; set; } = new List<NavigationTreeNode>();
-
-        public List<(List<string> path, List<INavigation> navigations)> TransparentIdentifierMapping { get; set; }
-            = new List<(List<string> path, List<INavigation> navigations)>();
-    }
-
-    public class SourceMapping2
-    {
         public IEntityType RootEntityType { get; set; }
 
         public NavigationTreeNode2 NavigationTree { get; set; }
@@ -36,9 +26,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
     {
         public ParameterExpression CurrentParameter { get; set; }
         public List<SourceMapping> SourceMappings { get; set; } = new List<SourceMapping>();
-        public List<SourceMapping2> SourceMappings2 { get; set; } = new List<SourceMapping2>();
         public LambdaExpression PendingSelector { get; set; }
-        public LambdaExpression PendingSelector2 { get; set; }
         public bool ApplyPendingSelector { get; set; }
         public List<List<string>> CustomRootMappings { get; set; } = new List<List<string>>();
     }
@@ -73,7 +61,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
 
             var unbinder = new NavigationPropertyUnbindingBindingExpressionVisitor2(State.CurrentParameter);
-            var pendingSelector = (LambdaExpression)unbinder.Visit(State.PendingSelector2);
+            var pendingSelector = (LambdaExpression)unbinder.Visit(State.PendingSelector);
 
             var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
                 ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)

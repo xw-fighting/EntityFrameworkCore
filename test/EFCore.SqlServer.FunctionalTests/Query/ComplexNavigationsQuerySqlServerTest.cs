@@ -4391,6 +4391,28 @@ WHERE ([e.OneToOne_Optional_FK1].[Name] <> N'Foo') OR [e.OneToOne_Optional_FK1].
                 @"");
         }
 
+        public override void SelectMany7()
+        {
+            base.SelectMany7();
+
+            AssertSql(
+                @"SELECT [ti.OneToOne_Required_PK1].[Id], [ti.OneToOne_Required_PK1].[Date], [ti.OneToOne_Required_PK1].[Level1_Optional_Id], [ti.OneToOne_Required_PK1].[Level1_Required_Id], [ti.OneToOne_Required_PK1].[Name], [ti.OneToOne_Required_PK1].[OneToMany_Optional_Inverse2Id], [ti.OneToOne_Required_PK1].[OneToMany_Optional_Self_Inverse2Id], [ti.OneToOne_Required_PK1].[OneToMany_Required_Inverse2Id], [ti.OneToOne_Required_PK1].[OneToMany_Required_Self_Inverse2Id], [ti.OneToOne_Required_PK1].[OneToOne_Optional_PK_Inverse2Id], [ti.OneToOne_Required_PK1].[OneToOne_Optional_Self2Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[Level2_Optional_Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[Level2_Required_Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[Name], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToMany_Optional_Inverse3Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToMany_Optional_Self_Inverse3Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToMany_Required_Inverse3Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToMany_Required_Self_Inverse3Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToOne_Optional_PK_Inverse3Id], [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[OneToOne_Optional_Self3Id]
+FROM [LevelOne] AS [e]
+LEFT JOIN [LevelTwo] AS [e.OneToOne_Optional_FK1] ON [e].[Id] = [e.OneToOne_Optional_FK1].[Level1_Optional_Id]
+CROSS JOIN [LevelTwo] AS [x]
+LEFT JOIN [LevelTwo] AS [ti.OneToOne_Required_PK1] ON [e].[Id] = [ti.OneToOne_Required_PK1].[Id]
+LEFT JOIN [LevelThree] AS [ti.OneToOne_Required_PK1.OneToOne_Required_PK2] ON [x].[Id] = [ti.OneToOne_Required_PK1.OneToOne_Required_PK2].[Id]
+WHERE ([e.OneToOne_Optional_FK1].[Name] <> N'Foo') OR [e.OneToOne_Optional_FK1].[Name] IS NULL");
+        }
+
+        public override void SelectMany8()
+        {
+            base.SelectMany8();
+
+            AssertSql(
+                @"");
+        }
+
         public override void Join1()
         {
             base.Join1();
