@@ -23,61 +23,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             _model = model;
         }
 
-        //[DebuggerStepThrough]
-        protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
-        {
-            var newBody = Visit(lambdaExpression.Body);
-
-            return newBody != lambdaExpression.Body
-                ? Expression.Lambda(lambdaExpression.Type, newBody, lambdaExpression.Parameters)
-                : lambdaExpression;
-        }
-
-        //[DebuggerStepThrough]
-        public override Expression Visit(Expression expression)
-        {
-            var newExpression = base.Visit(expression);
-
-            // TODO: convert any IEnumerable that is not NavigationExpansionExpression after visit?
-            if (newExpression == expression
-                && expression != null
-                && expression.Type != typeof(string)
-                // TODO: what about legit byte arrays?
-                && expression.Type != typeof(byte[]))
-            {
-                var enumerableInterface = expression.Type.IsGenericType && expression.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                    ? expression.Type
-                    : expression.Type.GetInterfaces().Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>)).SingleOrDefault();
-
-                if (enumerableInterface != null)
-                {
-                    var elementType = enumerableInterface.GetGenericArguments()[0];
-                    var pendingSelectorParameter = Expression.Parameter(elementType);
-
-                    var mapping = new List<string>();
-                    var pendingSelector = Expression.Lambda(
-                        new CustomRootExpression(pendingSelectorParameter, mapping, elementType),
-                        pendingSelectorParameter);
-
-                    var result = new NavigationExpansionExpression(
-                        expression,
-                        new NavigationExpansionExpressionState
-                        {
-                            CustomRootMappings = new List<List<string>> { mapping },
-                            SourceMappings = new List<SourceMapping2>(),
-                            CurrentParameter = pendingSelectorParameter,
-                            PendingSelector = pendingSelector,
-                            ApplyPendingSelector = false,
-                        },
-                        expression.Type);
-
-                    return result;
-                }
-            }
-
-            return newExpression;
-        }
-
         protected override Expression VisitExtension(Expression extensionExpression)
         {
             if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
@@ -117,16 +62,18 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 case nameof(Queryable.Single):
                 case nameof(Queryable.SingleOrDefault):
                 case nameof(Queryable.Any):
+                case nameof(Queryable.DefaultIfEmpty):
                 //case nameof(Queryable.Contains):
                 case nameof(Queryable.OfType):
                 case "AsTracking":
                 case "AsNoTracking":
-
-                    //case nameof(Queryable.DefaultIfEmpty):
                     return ProcessTerminatingOperation(methodCallExpression);
 
                 case nameof(Queryable.Join):
                     return ProcessJoin(methodCallExpression);
+
+                case nameof(Queryable.SelectMany):
+                    return ProcessSelectMany(methodCallExpression);
 
                 case "MaterializeCollectionNavigation":
                     var newArgument = (NavigationExpansionExpression)Visit(methodCallExpression.Arguments[1]);
@@ -139,12 +86,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 //    return newNavigationExpansionExpression;
 
                 default:
-                    if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
-                    {
-                        var result = ProcessSelectManyWithResultOperator(methodCallExpression);
+                    //if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
+                    //{
+                    //    var result = ProcessSelectManyWithResultOperator(methodCallExpression);
 
-                        return result;
-                    }
+                    //    return result;
+                    //}
 
                     return base.VisitMethodCall(methodCallExpression);
             }
@@ -157,7 +104,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var currentParameter = state.CurrentParameter;
             state = navigationExpansionExpression.State;
 
-            if (state.CurrentParameter.Name == null)
+            if (state.CurrentParameter.Name == null
+                && state.CurrentParameter.Name != currentParameter.Name)
             {
                 var newParameter = Expression.Parameter(state.CurrentParameter.Type, currentParameter.Name);
                 state.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(state.CurrentParameter, newParameter).Visit(state.PendingSelector);
@@ -259,12 +207,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 methodCallExpression.Type);
         }
 
-        private Expression ProcessSelectManyWithResultOperator(MethodCallExpression methodCallExpression)
+        private Expression ProcessSelectMany(MethodCallExpression methodCallExpression)
         {
             var outerSource = Visit(methodCallExpression.Arguments[0]);
             var outerState = new NavigationExpansionExpressionState
             {
-                CurrentParameter = methodCallExpression.Arguments[2].UnwrapQuote().Parameters[0]
+                CurrentParameter = Expression.Parameter(methodCallExpression.Method.GetGenericArguments()[0]),// methodCallExpression.Arguments[2].UnwrapQuote().Parameters[0]
             };
 
             if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
@@ -277,125 +225,108 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var collectionSelectorResult = FindAndApplyNavigations(outerSource, collectionSelector, outerState);
             if (collectionSelectorResult.lambdaBody is NavigationExpansionExpression collectionSelectorNavigationExpansionExpression)
             {
-                //var correlationChecker = new CorrelationChecker(collectionSelector.Parameters[0]);
-                //correlationChecker.Visit(collectionSelector.Body);
-                //if (!correlationChecker.Correlated)
+                var collectionSelectorState = collectionSelectorNavigationExpansionExpression.State;
+
+                if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
                 {
-                    // collection is uncorrelated with the source -> expand into subquery and keep as SelectMany
-                    var collectionSelectorState = collectionSelectorNavigationExpansionExpression.State;
-                    if (collectionSelectorState.CurrentParameter.Name == null
-                        || collectionSelectorState.CurrentParameter.Name != methodCallExpression.Arguments[1].UnwrapQuote().Parameters[0].Name)
+                    // TODO: && or || ??
+                    if (outerState.CurrentParameter.Name == null
+                        && outerState.CurrentParameter.Name != methodCallExpression.Arguments[2].UnwrapQuote().Parameters[0].Name)
                     {
-                        // TODO: should we rename the second parameter according to the second parameter of the result selector instead?
-                        var newParameter = Expression.Parameter(collectionSelectorState.CurrentParameter.Type, methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name);
-                        collectionSelectorState.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(collectionSelectorState.CurrentParameter, newParameter).Visit(collectionSelectorState.PendingSelector);
-                        collectionSelectorState.CurrentParameter = newParameter;
+                        var newOuterParameter = Expression.Parameter(outerState.CurrentParameter.Type, methodCallExpression.Arguments[2].UnwrapQuote().Parameters[0].Name);
+                        outerState.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(outerState.CurrentParameter, newOuterParameter).Visit(outerState.PendingSelector);
+                        outerState.CurrentParameter = newOuterParameter;
                     }
 
-                    var resultSelector = methodCallExpression.Arguments[2].UnwrapQuote();
-                    var resultSelectorRemap = RemapTwoArgumentResultSelector(resultSelector, outerState, collectionSelectorNavigationExpansionExpression.State);
+                    // TODO: remap the collection result selector on top of the new pending selector?????
 
-                    var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
-                        outerState.CurrentParameter.Type,
-                        collectionSelectorState.CurrentParameter.Type,
-                        resultSelectorRemap.lambda.Body.Type);
-
-                    // in case collection selector body is IQueryable, we need to adjust the type to IEnumerable, to match the SelectMany signature
-                    // therefore the delegate type is specified explicitly
-                    var newCollectionSelectorLambda = Expression.Lambda(
-                        newMethodInfo.GetParameters()[1].ParameterType.GetGenericArguments()[0],
-                        collectionSelectorNavigationExpansionExpression.Operand,
-                        outerState.CurrentParameter);
-
-                    var rewritten = Expression.Call(
-                        newMethodInfo,
-                        outerSource,
-                        newCollectionSelectorLambda,
-                        resultSelectorRemap.lambda);
-
-                    // temporarily change selector to ti => ti for purpose of finding & expanding navigations in the pending selector lambda itself
-                    var pendingSelector = resultSelectorRemap.state.PendingSelector;
-                    resultSelectorRemap.state.PendingSelector = Expression.Lambda(resultSelectorRemap.state.PendingSelector.Parameters[0], resultSelectorRemap.state.PendingSelector.Parameters[0]);
-                    var result = FindAndApplyNavigations(rewritten, pendingSelector, resultSelectorRemap.state);
-                    result.state.PendingSelector = Expression.Lambda(result.lambdaBody, result.state.CurrentParameter);
-
-                    return new NavigationExpansionExpression(
-                        result.source,
-                        result.state,
-                        methodCallExpression.Type);
+                    if (collectionSelectorState.CurrentParameter.Name == null
+                        && collectionSelectorState.CurrentParameter.Name != methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name)
+                    {
+                        var newInnerParameter = Expression.Parameter(collectionSelectorState.CurrentParameter.Type, methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name);
+                        collectionSelectorState.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(collectionSelectorState.CurrentParameter, newInnerParameter).Visit(collectionSelectorState.PendingSelector);
+                        collectionSelectorState.CurrentParameter = newInnerParameter;
+                    }
                 }
 
-                //var correlationPredicateExtractor = new CorrelationPredicateExtractingExpressionVisitor(collectionSelectorResult.state.CurrentParameter);
-                //var collectionSelectorWithoutCorelationPredicate = (NavigationExpansionExpression)correlationPredicateExtractor.Visit(collectionSelectorNavigationExpansionExpression);
-                //if (correlationPredicateExtractor.CorrelationPredicate != null)
-                //{
-                //    // if collection selector is correlated then outer state then outerState should be updated with new values (as the collectionSelector is essencially extension of outer)
-                //    outerState = collectionSelectorResult.state;
-                //    outerSource = collectionSelectorResult.source;
+                if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo)
+                    && (collectionSelectorState.CurrentParameter.Name == null
+                        || collectionSelectorState.CurrentParameter.Name != methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name))
+                {
+                    // TODO: should we rename the second parameter according to the second parameter of the result selector instead?
+                    var newParameter = Expression.Parameter(collectionSelectorState.CurrentParameter.Type, methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name);
+                    collectionSelectorState.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(collectionSelectorState.CurrentParameter, newParameter).Visit(collectionSelectorState.PendingSelector);
+                    collectionSelectorState.CurrentParameter = newParameter;
+                }
 
-                //    var outerKeyLambdaBody = new NavigationPropertyUnbindingBindingExpressionVisitor2(outerState.CurrentParameter).Visit(correlationPredicateExtractor.CorrelationPredicate.EqualExpression.Left);
-                //    var outerKeyLambda = Expression.Lambda(outerKeyLambdaBody, outerState.CurrentParameter);
+                // in case collection selector body is IQueryable, we need to adjust the type to IEnumerable, to match the SelectMany signature
+                // therefore the delegate type is specified explicitly
+                var collectionSelectorLambdaType = typeof(Func<,>).MakeGenericType(
+                    outerState.CurrentParameter.Type,
+                    typeof(IEnumerable<>).MakeGenericType(collectionSelectorNavigationExpansionExpression.State.CurrentParameter.Type));
 
-                //    // inner key selector needs to be remapped - when correlation predicate was being built it was based on "naked" entity from the collection
-                //    // however there could have been navigations afterwards which would have caused types to be changed to TransparentIdentifiers
-                //    // all necessary mappings should be stored in the inner NavigationExpansionExpression state.
-                //    var innerKeyLambda = Expression.Lambda(correlationPredicateExtractor.CorrelationPredicate.EqualExpression.Right, correlationPredicateExtractor.CorrelatedCollectionParameter);
-                //    innerKeyLambda = ExpressionExtensions.CombineAndRemapLambdas(collectionSelectorWithoutCorelationPredicate.State.PendingSelector2, innerKeyLambda);
-                //    innerKeyLambda = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor2(collectionSelectorWithoutCorelationPredicate.State.CurrentParameter).Visit(innerKeyLambda);
+                var newCollectionSelectorLambda = Expression.Lambda(
+                    collectionSelectorLambdaType,
+                    collectionSelectorNavigationExpansionExpression.Operand,
+                    outerState.CurrentParameter);
 
-                //    var remapResult = RemapTwoArgumentResultSelector3(methodCallExpression.Arguments[2].UnwrapQuote(), outerState, collectionSelectorWithoutCorelationPredicate.State);
+                newCollectionSelectorLambda = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor2(outerState.CurrentParameter).Visit(newCollectionSelectorLambda);
 
-                //    var joinMethodInfo = QueryableJoinMethodInfo.MakeGenericMethod(
-                //        outerState.CurrentParameter.Type,
-                //        collectionSelectorWithoutCorelationPredicate.State.CurrentParameter.Type,
-                //        innerKeyLambda.Body.Type,
-                //        remapResult.lambda.Body.Type);
+                if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyMethodInfo))
+                {
+                    return BuildSelectManyWithoutResultOperatorMethodCall(methodCallExpression, outerSource, outerState, newCollectionSelectorLambda, collectionSelectorState);
+                }
 
-                //    var rewritten = Expression.Call(
-                //        joinMethodInfo,
-                //        outerSource,
-                //        collectionSelectorWithoutCorelationPredicate.Operand,
-                //        outerKeyLambda,
-                //        innerKeyLambda,
-                //        remapResult.lambda);
+                var resultSelector = methodCallExpression.Arguments[2].UnwrapQuote();
+                var resultSelectorRemap = RemapTwoArgumentResultSelector(resultSelector, outerState, collectionSelectorNavigationExpansionExpression.State);
 
-                //    // TODO: should we run FindAndApplyNavigations on the result selector as well? - to expand all the navigations there, just like we do for uncorrelated case?
+                var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                    outerState.CurrentParameter.Type,
+                    collectionSelectorState.CurrentParameter.Type,
+                    resultSelectorRemap.lambda.Body.Type);
 
-                //    return new NavigationExpansionExpression(
-                //        rewritten,
-                //        remapResult.state,
-                //        methodCallExpression.Type);
-                //}
-                //else
-                //{
-                //    throw new InvalidOperationException("correlation predicate not found. Expression: " + methodCallExpression);
-                //}
+                var rewritten = Expression.Call(
+                    newMethodInfo,
+                    outerSource,
+                    newCollectionSelectorLambda,
+                    resultSelectorRemap.lambda);
+
+                // temporarily change selector to ti => ti for purpose of finding & expanding navigations in the pending selector lambda itself
+                var pendingSelector = resultSelectorRemap.state.PendingSelector;
+                resultSelectorRemap.state.PendingSelector = Expression.Lambda(resultSelectorRemap.state.PendingSelector.Parameters[0], resultSelectorRemap.state.PendingSelector.Parameters[0]);
+                var result = FindAndApplyNavigations(rewritten, pendingSelector, resultSelectorRemap.state);
+                result.state.PendingSelector = Expression.Lambda(result.lambdaBody, result.state.CurrentParameter);
+
+                return new NavigationExpansionExpression(
+                    result.source,
+                    result.state,
+                    methodCallExpression.Type);
             }
 
             throw new InvalidOperationException("collection selector was not NavigationExpansionExpression");
         }
 
-        //private class CorrelationChecker : NavigationExpansionExpressionVisitorBase
-        //{
-        //    private ParameterExpression _rootParameter;
+        private Expression BuildSelectManyWithoutResultOperatorMethodCall(
+            MethodCallExpression methodCallExpression,
+            Expression outerSource,
+            NavigationExpansionExpressionState outerState,
+            LambdaExpression newCollectionSelectorLambda,
+            NavigationExpansionExpressionState collectionSelectorState)
+        {
+            var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                outerState.CurrentParameter.Type,
+                collectionSelectorState.CurrentParameter.Type);
 
-        //    public bool Correlated { get; private set; } = false;
+            var rewritten = Expression.Call(
+                newMethodInfo,
+                outerSource,
+                newCollectionSelectorLambda);
 
-        //    public CorrelationChecker(ParameterExpression rootParameter)
-        //    {
-        //        _rootParameter = rootParameter;
-        //    }
-
-        //    protected override Expression VisitParameter(ParameterExpression parameterExpression)
-        //    {
-        //        if (parameterExpression == _rootParameter)
-        //        {
-        //            Correlated = true;
-        //        }
-
-        //        return parameterExpression;
-        //    }
-        //}
+            return new NavigationExpansionExpression(
+                rewritten,
+                collectionSelectorState,
+                methodCallExpression.Type);
+        }
 
         private Expression ProcessJoin(MethodCallExpression methodCallExpression)
         {
@@ -467,6 +398,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             return methodCallExpression;
         }
 
+        private bool IsQueryable(Type type)
+        {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IQueryable<>))
+            {
+                return true;
+            }
+
+            return type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+        }
+
+
         private Expression ProcessTerminatingOperation(MethodCallExpression methodCallExpression)
         {
             var source = Visit(methodCallExpression.Arguments[0]);
@@ -497,7 +439,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     var pssmg = new PendingSelectorSourceMappingGenerator(state.PendingSelector.Parameters[0], entityTypeOverride);
                     pssmg.Visit(state.PendingSelector);
 
-                    var selectorMethodInfo = QueryableSelectMethodInfo.MakeGenericMethod(
+                    var selectorMethodInfo = IsQueryable(navigationExpansionExpression.Operand.Type)
+                        ? QueryableSelectMethodInfo
+                        : EnumerableSelectMethodInfo;
+
+                    selectorMethodInfo = selectorMethodInfo.MakeGenericMethod(
                         state.CurrentParameter.Type,
                         newSelectorBody.Type);
 
@@ -529,14 +475,22 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         SourceMappings = pssmg.SourceMappings
                     };
 
-                    if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
+                    if (/*methodCallExpression.Method.MethodIsClosedFormOf(QueryableDistinctMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableFirstOrDefaultMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSingleOrDefaultMethodInfo)
                         || methodCallExpression.Method.MethodIsClosedFormOf(QueryableAny)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType)*/
 
-                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableOfType)
+                        // TODO: fix this, use method infos instead, if this is the right place to handle Enumerables
+                        methodCallExpression.Method.Name == "Distinct"
+                        || methodCallExpression.Method.Name == "First"
+                        || methodCallExpression.Method.Name == "FirstOrDefault"
+                        || methodCallExpression.Method.Name == "Single"
+                        || methodCallExpression.Method.Name == "SingleOrDefault"
+                        || methodCallExpression.Method.Name == "Any"
+                        || methodCallExpression.Method.Name == "OfType"
 
                         || methodCallExpression.Method.Name == "AsTracking"
                         || methodCallExpression.Method.Name == "AsNoTracking")
@@ -546,11 +500,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                         source = Expression.Call(newMethod, new[] { result });
                     }
-                    else if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
-                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSkipMethodInfo)
+                    else if (/*methodCallExpression.Method.MethodIsClosedFormOf(QueryableTakeMethodInfo)
+                        || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSkipMethodInfo)*/
+                        methodCallExpression.Method.Name == "Take"
+                        || methodCallExpression.Method.Name == "Skip"
                         /*|| methodCallExpression.Method.MethodIsClosedFormOf(QueryableContains)*/)
                     {
-                        // TODO: is it necessary to visit the argument, or can we just pass it as is?
                         var newArgument = Visit(methodCallExpression.Arguments[1]);
 
                         source = methodCallExpression.Update(methodCallExpression.Object, new[] { result, newArgument });
@@ -562,8 +517,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 }
                 else
                 {
-                    // TODO: need to run thru Expression.Update?
-                    source = methodCallExpression;
+                    var newArguments = methodCallExpression.Arguments.ToList();
+                    newArguments[0] = source;
+                    source = methodCallExpression.Update(methodCallExpression.Object, newArguments);
+
                     var newParameter = Expression.Parameter(state.CurrentParameter.Type);
                     state.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(state.CurrentParameter, newParameter).Visit(state.PendingSelector);
                     state.CurrentParameter = newParameter;
@@ -589,7 +546,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 var elementType = constantExpression.Value.GetType().GetGenericArguments()[0];
                 var entityType = _model.FindEntityType(elementType);
 
-                var sourceMapping = new SourceMapping2
+                var sourceMapping = new SourceMapping
                 {
                     RootEntityType = entityType,
                 };
@@ -612,7 +569,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     new NavigationExpansionExpressionState
                     {
                         CustomRootMappings = new List<List<string>>(),
-                        SourceMappings = new List<SourceMapping2> { sourceMapping },
+                        SourceMappings = new List<SourceMapping> { sourceMapping },
                         CurrentParameter = pendingSelectorParameter,
                         PendingSelector = pendingSelector,
                         ApplyPendingSelector = false,
@@ -657,6 +614,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             LambdaExpression lambda,
             NavigationExpansionExpressionState state)
         {
+            if (state.PendingSelector == null)
+            {
+                return (source, lambda.Body, state);
+            }
+
             var remappedLambdaBody = ExpressionExtensions.CombineAndRemapLambdas(state.PendingSelector, lambda).Body;
 
             var binder = new NavigationPropertyBindingExpressionVisitor2(
@@ -725,7 +687,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         private (Expression source, ParameterExpression parameter) AddNavigationJoin2(
             Expression sourceExpression,
             ParameterExpression parameterExpression,
-            SourceMapping2 sourceMapping2,
+            SourceMapping sourceMapping,
             NavigationTreeNode2 navigationTree2,
             NavigationExpansionExpressionState state,
             List<INavigation> navigationPath)
@@ -900,9 +862,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 // remap navigation 'To' paths -> for this navigation prepend "Inner", for every other (already expanded) navigation prepend "Outer"
                 navigationTree2.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
-                foreach (var sourceMapping in state.SourceMappings)
+                foreach (var mapping in state.SourceMappings)
                 {
-                    foreach (var navigationTreeNode in sourceMapping.NavigationTree.Flatten().Where(n => n.Expanded && n != navigationTree2))
+                    foreach (var navigationTreeNode in mapping.NavigationTree.Flatten().Where(n => n.Expanded && n != navigationTree2))
                     {
                         navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
                         if (navigationTree2.Optional)
@@ -935,7 +897,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 result = AddNavigationJoin2(
                     result.source,
                     result.parameter,
-                    sourceMapping2,
+                    sourceMapping,
                     child,
                     state,
                     navigationPath.ToList());
@@ -1311,10 +1273,10 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             private List<string> _currentPath = new List<string>();
             private IEntityType _entityTypeOverride;
 
-            public List<SourceMapping2> SourceMappings = new List<SourceMapping2>();
+            public List<SourceMapping> SourceMappings = new List<SourceMapping>();
 
-            public Dictionary<NavigationBindingExpression2, SourceMapping2> BindingToSourceMapping
-                = new Dictionary<NavigationBindingExpression2, SourceMapping2>();
+            public Dictionary<NavigationBindingExpression2, SourceMapping> BindingToSourceMapping
+                = new Dictionary<NavigationBindingExpression2, SourceMapping>();
 
             public PendingSelectorSourceMappingGenerator(ParameterExpression rootParameter, IEntityType entityTypeOverride)
             {
@@ -1362,7 +1324,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 {
                     if (navigationBindingExpression.RootParameter == _rootParameter)
                     {
-                        var sourceMapping = new SourceMapping2
+                        var sourceMapping = new SourceMapping
                         {
                             RootEntityType = _entityTypeOverride ?? navigationBindingExpression.EntityType,
                         };

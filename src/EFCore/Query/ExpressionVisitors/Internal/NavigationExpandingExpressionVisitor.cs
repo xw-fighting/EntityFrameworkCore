@@ -299,7 +299,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public bool Expanded { get; set; }
 
         public List<List<string>> FromMappings { get; set; } = new List<List<string>>();
-        public List<string> ToMapping { get; set; }// = new List<string>();
+        public List<string> ToMapping { get; set; }
 
         public static NavigationTreeNode2 CreateRoot(
             [NotNull] SourceMapping sourceMapping,

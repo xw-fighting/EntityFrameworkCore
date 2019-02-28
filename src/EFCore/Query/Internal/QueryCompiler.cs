@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Remotion.Linq.Clauses.Expressions;
@@ -103,6 +104,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
             var navigationExpander = new NavigationExpander(_model);
             var newQuery = navigationExpander.ExpandNavigations(query);
+            newQuery = new CorrelatedSelectManyToJoinRewritingExpressionVisitor().Visit(newQuery);
 
             var compiledQuery
                 = _compiledQueryCache
@@ -126,102 +128,102 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             return CompileQueryCore<TResult>(query, _queryModelGenerator, _database, _logger, _contextType);
         }
 
-        private class TransparentIdentifierRemovingExpressionVisitor : RelinqExpressionVisitor
-        {
-            private static Expression ExtractFromTransparentIdentifier(MemberExpression memberExpression, Stack<string> extractionPath)
-            {
-                if (memberExpression.Member.Name == "Outer"
-                    || memberExpression.Member.Name == "Inner")
-                {
-                    extractionPath.Push(memberExpression.Member.Name);
+        //private class TransparentIdentifierRemovingExpressionVisitor : RelinqExpressionVisitor
+        //{
+        //    private static Expression ExtractFromTransparentIdentifier(MemberExpression memberExpression, Stack<string> extractionPath)
+        //    {
+        //        if (memberExpression.Member.Name == "Outer"
+        //            || memberExpression.Member.Name == "Inner")
+        //        {
+        //            extractionPath.Push(memberExpression.Member.Name);
 
-                    if (memberExpression.Expression is MemberExpression innerMember)
-                    {
-                        return ExtractFromTransparentIdentifier(innerMember, extractionPath);
-                    }
-                    else
-                    {
-                        var result = memberExpression.Expression;
-                        while (extractionPath.Count > 0)
-                        {
-                            // HACK: sometimes QM will access Inner/Outer property of the QSRE that is itself a transparent identifier - we should just allow that
-                            if (!(result is NewExpression))
-                            {
-                                if (extractionPath.Count == 0)
-                                {
-                                    return memberExpression;
-                                }
+        //            if (memberExpression.Expression is MemberExpression innerMember)
+        //            {
+        //                return ExtractFromTransparentIdentifier(innerMember, extractionPath);
+        //            }
+        //            else
+        //            {
+        //                var result = memberExpression.Expression;
+        //                while (extractionPath.Count > 0)
+        //                {
+        //                    // HACK: sometimes QM will access Inner/Outer property of the QSRE that is itself a transparent identifier - we should just allow that
+        //                    if (!(result is NewExpression))
+        //                    {
+        //                        if (extractionPath.Count == 0)
+        //                        {
+        //                            return memberExpression;
+        //                        }
 
-                                var expr = Expression.Field(result, extractionPath.Pop());
-                                while (extractionPath.Count > 0)
-                                {
-                                    expr = Expression.Field(expr, extractionPath.Pop());
-                                }
+        //                        var expr = Expression.Field(result, extractionPath.Pop());
+        //                        while (extractionPath.Count > 0)
+        //                        {
+        //                            expr = Expression.Field(expr, extractionPath.Pop());
+        //                        }
 
-                                return expr;
+        //                        return expr;
 
-                                //return memberExpression;
-                            }
+        //                        //return memberExpression;
+        //                    }
 
-                            var extractionPathElement = extractionPath.Pop();
+        //                    var extractionPathElement = extractionPath.Pop();
 
-                            var newExpression = (NewExpression)result;
+        //                    var newExpression = (NewExpression)result;
 
-                            if (extractionPathElement == "Outer")
-                            {
-                                result = newExpression.Arguments[0];
-                            }
-                            else
-                            {
-                                result = newExpression.Arguments[1];
-                            }
-                        }
+        //                    if (extractionPathElement == "Outer")
+        //                    {
+        //                        result = newExpression.Arguments[0];
+        //                    }
+        //                    else
+        //                    {
+        //                        result = newExpression.Arguments[1];
+        //                    }
+        //                }
 
-                        return result;
-                    }
-                }
+        //                return result;
+        //            }
+        //        }
 
-                return memberExpression;
-            }
+        //        return memberExpression;
+        //    }
 
-            protected override Expression VisitMember(MemberExpression memberExpression)
-            {
-                if (memberExpression.Member.Name == "Outer"
-                    || memberExpression.Member.Name == "Inner")
-                {
-                    var result = ExtractFromTransparentIdentifier(memberExpression, new Stack<string>());
+        //    protected override Expression VisitMember(MemberExpression memberExpression)
+        //    {
+        //        if (memberExpression.Member.Name == "Outer"
+        //            || memberExpression.Member.Name == "Inner")
+        //        {
+        //            var result = ExtractFromTransparentIdentifier(memberExpression, new Stack<string>());
 
-                    return result;
-                }
-                else
-                {
-                    return base.VisitMember(memberExpression);
-                }
-            }
+        //            return result;
+        //        }
+        //        else
+        //        {
+        //            return base.VisitMember(memberExpression);
+        //        }
+        //    }
 
-            protected override Expression VisitSubQuery(SubQueryExpression subQueryExpression)
-            {
-                subQueryExpression.QueryModel.TransformExpressions(Visit);
+        //    protected override Expression VisitSubQuery(SubQueryExpression subQueryExpression)
+        //    {
+        //        subQueryExpression.QueryModel.TransformExpressions(Visit);
 
-                return base.VisitSubQuery(subQueryExpression);
-            }
-        }
+        //        return base.VisitSubQuery(subQueryExpression);
+        //    }
+        //}
 
-        private class AnonymousObjectAccessSimplifyingExpressionVisitor : RelinqExpressionVisitor
-        {
-            protected override Expression VisitMember(MemberExpression memberExpression)
-            {
-                if (memberExpression.Expression is NewExpression newExpression
-                    && newExpression.Type.Name.Contains("__AnonymousType"))
-                {
-                    var matchingMemberIndex = newExpression.Members.Select((m, i) => new { match = m == memberExpression.Member, i }).Where(r => r.match).Single().i;
+        //private class AnonymousObjectAccessSimplifyingExpressionVisitor : RelinqExpressionVisitor
+        //{
+        //    protected override Expression VisitMember(MemberExpression memberExpression)
+        //    {
+        //        if (memberExpression.Expression is NewExpression newExpression
+        //            && newExpression.Type.Name.Contains("__AnonymousType"))
+        //        {
+        //            var matchingMemberIndex = newExpression.Members.Select((m, i) => new { match = m == memberExpression.Member, i }).Where(r => r.match).Single().i;
 
-                    return newExpression.Arguments[matchingMemberIndex];
-                }
+        //            return newExpression.Arguments[matchingMemberIndex];
+        //        }
 
-                return base.VisitMember(memberExpression);
-            }
-        }
+        //        return base.VisitMember(memberExpression);
+        //    }
+        //}
 
         private static Func<QueryContext, TResult> CompileQueryCore<TResult>(
             Expression query,

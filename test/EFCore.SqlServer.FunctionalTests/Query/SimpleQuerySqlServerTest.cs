@@ -4759,11 +4759,11 @@ WHERE ([c].[CustomerID] LIKE N'A' + N'%' AND (LEFT([c].[CustomerID], LEN(N'A')) 
             await base.SelectMany_after_client_method(isAsync);
 
             AssertContainsSql(
-                @"SELECT [c.Orders0].[CustomerID], [c.Orders0].[OrderDate]
-FROM [Orders] AS [c.Orders0]",
-                //
                 @"SELECT [c0].[CustomerID], [c0].[Address], [c0].[City], [c0].[CompanyName], [c0].[ContactName], [c0].[ContactTitle], [c0].[Country], [c0].[Fax], [c0].[Phone], [c0].[PostalCode], [c0].[Region]
-FROM [Customers] AS [c0]");
+FROM [Customers] AS [c0]",
+                //
+                @"SELECT [o0].[CustomerID], [o0].[OrderDate]
+FROM [Orders] AS [o0]");
         }
 
         public override async Task Collection_navigation_equal_to_null_for_subquery(bool isAsync)

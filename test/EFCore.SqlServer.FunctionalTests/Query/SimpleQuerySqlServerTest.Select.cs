@@ -382,7 +382,7 @@ WHERE [c].[CustomerID] LIKE N'A' + N'%' AND (LEFT([c].[CustomerID], LEN(N'A')) =
     SELECT TOP(1) (
         SELECT COUNT(*)
         FROM [Order Details] AS [od]
-        WHERE ([od].[OrderID] > 10) AND ([o].[OrderID] = [od].[OrderID])
+        WHERE ([o].[OrderID] = [od].[OrderID]) AND ([od].[OrderID] > 10)
     )
     FROM [Orders] AS [o]
     WHERE ([c].[CustomerID] = [o].[CustomerID]) AND ([o].[OrderID] < 10500)
@@ -400,11 +400,11 @@ WHERE [c].[CustomerID] LIKE N'A' + N'%' AND (LEFT([c].[CustomerID], LEN(N'A')) =
     SELECT TOP(1) (
         SELECT TOP(1) [od].[ProductID]
         FROM [Order Details] AS [od]
-        WHERE ([od].[OrderID] <> (
+        WHERE ([o].[OrderID] = [od].[OrderID]) AND ([od].[OrderID] <> (
             SELECT COUNT(*)
             FROM [Orders] AS [o0]
             WHERE [c].[CustomerID] = [o0].[CustomerID]
-        )) AND ([o].[OrderID] = [od].[OrderID])
+        ))
     )
     FROM [Orders] AS [o]
     WHERE ([c].[CustomerID] = [o].[CustomerID]) AND ([o].[OrderID] < 10500)
@@ -422,7 +422,7 @@ WHERE [c].[CustomerID] LIKE N'A' + N'%' AND (LEFT([c].[CustomerID], LEN(N'A')) =
     SELECT TOP(1) (
         SELECT TOP(1) [od].[ProductID]
         FROM [Order Details] AS [od]
-        WHERE ([od].[OrderID] <> CAST(LEN([c].[CustomerID]) AS int)) AND ([o].[OrderID] = [od].[OrderID])
+        WHERE ([o].[OrderID] = [od].[OrderID]) AND ([od].[OrderID] <> CAST(LEN([c].[CustomerID]) AS int))
     )
     FROM [Orders] AS [o]
     WHERE ([c].[CustomerID] = [o].[CustomerID]) AND ([o].[OrderID] < 10500)

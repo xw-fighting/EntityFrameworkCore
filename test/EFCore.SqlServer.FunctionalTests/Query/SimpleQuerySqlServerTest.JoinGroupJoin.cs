@@ -227,6 +227,18 @@ FROM [Orders] AS [o]",
 FROM [Customers] AS [c]");
         }
 
+        public override async Task Join_local_bytes_closure_is_cached_correctly(bool isAsync)
+        {
+            await base.Join_local_bytes_closure_is_cached_correctly(isAsync);
+
+            AssertSql(
+                @"SELECT [e].[EmployeeID]
+FROM [Employees] AS [e]",
+                //
+                @"SELECT [e].[EmployeeID]
+FROM [Employees] AS [e]");
+        }
+
         public override async Task Join_same_collection_multiple(bool isAsync)
         {
             await base.Join_same_collection_multiple(isAsync);

@@ -8,6 +8,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore.Extensions.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal;
 using Remotion.Linq;
 using Remotion.Linq.Clauses;
@@ -76,6 +77,10 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             new AdditionalFromClauseOptimizingQueryModelVisitor(_queryCompilationContext).VisitQueryModel(queryModel);
 
             VisitQueryModel(queryModel);
+
+            // second pass of TransparentIdentifier removal - this is temporary, until relinq is removed
+            var tirev = new TransparentIdentifierRemovingExpressionVisitor();
+            queryModel.TransformExpressions(tirev.Visit);
 
             queryModel.TransformExpressions(_transformingExpressionVisitor.Visit);
             queryModel.TransformExpressions(new ConditionalOptimizingExpressionVisitor().Visit);
