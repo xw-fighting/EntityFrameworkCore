@@ -134,35 +134,29 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             //    }
             //}
 
-            if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression2)
+            if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
-                if (navigationBindingExpression2.NavigationTreeNode.Parent != null
-                    && navigationBindingExpression2.NavigationTreeNode.Navigation is INavigation lastNavigation
+                if (navigationBindingExpression.NavigationTreeNode.Parent != null
+                    && navigationBindingExpression.NavigationTreeNode.Navigation is INavigation lastNavigation
                     && lastNavigation.IsCollection())
                 {
                     var collectionNavigationElementType = lastNavigation.ForeignKey.DeclaringEntityType.ClrType;
                     var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
-                    var caller = navigationBindingExpression2.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression2.RootParameter);
-                    navigationBindingExpression2.NavigationTreeNode.Parent.Children.Remove(navigationBindingExpression2.NavigationTreeNode);
+                    var caller = navigationBindingExpression.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression.RootParameter);
+                    navigationBindingExpression.NavigationTreeNode.Parent.Children.Remove(navigationBindingExpression.NavigationTreeNode);
 
                     //TODO: this could be other things too: EF.Property and maybe field
-                    var outerBinding = new NavigationBindingExpression2(
-                    navigationBindingExpression2.RootParameter,
-                    navigationBindingExpression2.NavigationTreeNode.Parent,
-                    navigationBindingExpression2.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression2.SourceMapping.RootEntityType,
-                    navigationBindingExpression2.SourceMapping,
-                    lastNavigation.DeclaringEntityType.ClrType); //caller.Type);
+                    var outerBinding = new NavigationBindingExpression(
+                    navigationBindingExpression.RootParameter,
+                    navigationBindingExpression.NavigationTreeNode.Parent,
+                    navigationBindingExpression.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression.SourceMapping.RootEntityType,
+                    navigationBindingExpression.SourceMapping,
+                    lastNavigation.DeclaringEntityType.ClrType);
 
                     var outerKeyAccess = CreateKeyAccessExpression(
                         outerBinding,
                         lastNavigation.ForeignKey.PrincipalKey.Properties);
-
-                    //var outerSource = navigationBindingExpression2.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression2.RootParameter);
-
-                    //var outerKeyAccess = CreateKeyAccessExpression(
-                    //    outerSource,
-                    //    lastNavigation.ForeignKey.PrincipalKey.Properties);
 
                     var innerParameter = Expression.Parameter(collectionNavigationElementType, collectionNavigationElementType.GenerateParameterName());
                     var innerKeyAccess = CreateKeyAccessExpression(
@@ -173,13 +167,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                             outerKeyAccess,
                             innerKeyAccess,
-                            outerBinding,//outerSource
-                            navigationBindingExpression2.RootParameter,
+                            outerBinding,
+                            navigationBindingExpression.RootParameter,
                             // TODO: this is hacky
-                            navigationBindingExpression2.NavigationTreeNode.NavigationChain()),
+                            navigationBindingExpression.NavigationTreeNode.NavigationChain()),
                         innerParameter);
 
-                    predicate = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor2(navigationBindingExpression2.RootParameter).Visit(predicate);
+                    predicate = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(navigationBindingExpression.RootParameter).Visit(predicate);
 
                     var result = Expression.Call(
                         QueryableWhereMethodInfo.MakeGenericMethod(collectionNavigationElementType),
@@ -187,22 +181,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                         predicate);
 
                     return result;
-
-                    //if (result.Type != navigationBindingExpression2.Type)
-                    //{
-                    //    // TODO: fix that - method should be somewhere in the nav expansion pipeline
-                    //    var materializeCollectionNavigationMethodInfo
-                    //        = CollectionNavigationSubqueryInjector.MaterializeCollectionNavigationMethodInfo.MakeGenericMethod(navigationBindingExpression2.Type.GetGenericArguments()[0]);
-
-                    //    return Expression.Call(
-                    //        materializeCollectionNavigationMethodInfo,
-                    //        Expression.Constant(navigationBindingExpression2.NavigationTreeNode.Navigation),
-                    //        result);
-                    //}
-                    //else
-                    //{
-                    //    return result;
-                    //}
                 }
             }
 

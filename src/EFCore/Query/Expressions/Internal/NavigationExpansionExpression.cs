@@ -19,7 +19,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
     {
         public IEntityType RootEntityType { get; set; }
 
-        public NavigationTreeNode2 NavigationTree { get; set; }
+        public NavigationTreeNode NavigationTree { get; set; }
     }
 
     public class NavigationExpansionExpressionState
@@ -60,8 +60,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
 
-            var unbinder = new NavigationPropertyUnbindingBindingExpressionVisitor2(State.CurrentParameter);
-            var pendingSelector = (LambdaExpression)unbinder.Visit(State.PendingSelector);
+            var pendingSelector = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(State.CurrentParameter).Visit(State.PendingSelector);
 
             var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
                 ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)

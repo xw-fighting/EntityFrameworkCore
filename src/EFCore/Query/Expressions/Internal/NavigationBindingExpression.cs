@@ -12,58 +12,20 @@ using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 {
-    //public class NavigationBindingExpression : Expression, IPrintable
-    //{
-    //    public Expression Operand { get; }
-    //    public ParameterExpression RootParameter { get; }
-    //    public IEntityType EntityType { get; }
-    //    public IReadOnlyList<INavigation> Navigations { get; }
-    //    public SourceMapping SourceMapping { get; }
-
-    //    public override ExpressionType NodeType => ExpressionType.Extension;
-    //    public override bool CanReduce => true;
-    //    public override Type Type => Operand.Type;
-
-    //    public override Expression Reduce()
-    //        => Operand;
-
-    //    public NavigationBindingExpression(
-    //        Expression operand,
-    //        ParameterExpression rootParameter,
-    //        List<INavigation> navigations,
-    //        IEntityType entityType,
-    //        SourceMapping sourceMapping)
-    //    {
-    //        Operand = operand;
-    //        RootParameter = rootParameter;
-    //        Navigations = navigations.AsReadOnly();
-    //        EntityType = entityType;
-    //        SourceMapping = sourceMapping;
-    //    }
-
-    //    public void Print([NotNull] ExpressionPrinter expressionPrinter)
-    //    {
-    //        expressionPrinter.StringBuilder.Append("BINDING(");
-    //        expressionPrinter.Visit(RootParameter);
-    //        expressionPrinter.StringBuilder.Append(" | ");
-    //        expressionPrinter.StringBuilder.Append(string.Join(", ", Navigations.Select(n => n.Name)) + ")");
-    //    }
-    //}
-
-    public class NavigationBindingExpression2 : Expression, IPrintable
+    public class NavigationBindingExpression : Expression, IPrintable
     {
         public ParameterExpression RootParameter { get; }
         public IEntityType EntityType { get; }
-        public NavigationTreeNode2 NavigationTreeNode { get; }
+        public NavigationTreeNode NavigationTreeNode { get; }
         public SourceMapping SourceMapping { get; }
 
         public override ExpressionType NodeType => ExpressionType.Extension;
         public override bool CanReduce => false;
         public override Type Type { get; }
 
-        public NavigationBindingExpression2(
+        public NavigationBindingExpression(
             ParameterExpression rootParameter,
-            NavigationTreeNode2 navigationTreeNode,
+            NavigationTreeNode navigationTreeNode,
             IEntityType entityType,
             SourceMapping sourceMapping,
             Type type)

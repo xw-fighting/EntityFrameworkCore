@@ -5,15 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Text;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Extensions.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.NavigationExpansion;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
@@ -53,17 +50,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
             return (LambdaExpression)lcev.Visit(second);
         }
-
-
-        //public static Expression RemapExpression(Expression targetExpression, ParameterExpression targetParameterExpression, Expression replaceParameterWithExpression)
-        //{
-        //    new ExpressionReplacingVisitor()
-
-
-
-
-        //}
-
+        
         // TODO: DRY this entire thing
         private class ExpressionReplacingVisitor : ExpressionVisitor
         {
@@ -84,12 +71,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             // TODO: DRY
             protected override Expression VisitExtension(Expression extensionExpression)
             {
-                if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression)
+                if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
                 {
                     var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression.RootParameter);
 
                     return newRootParameter != navigationBindingExpression.RootParameter
-                        ? new NavigationBindingExpression2(
+                        ? new NavigationBindingExpression(
                             newRootParameter,
                             navigationBindingExpression.NavigationTreeNode,
                             navigationBindingExpression.EntityType,
@@ -166,104 +153,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
     public class NavigationTreeNode
     {
-        public INavigation Navigation { get; set; }
-        public bool Optional { get; set; }
-        public NavigationTreeNode Parent { get; set; }
-        public List<NavigationTreeNode> Children { get; set; }
-        public bool Expanded { get; set; }
-
-        //public List<List<string>> FromMappings { get; set; }
-        //public List<string> ToMapping { get; set; }
-
-        public List<string> GeneratePath()
-        {
-            if (Parent == null)
-            {
-                return new List<string> { Navigation.Name };
-            }
-            else
-            {
-                var result = Parent.GeneratePath();
-                result.Add(Navigation.Name);
-
-                return result;
-            }
-        }
-
-        public static NavigationTreeNode Create(IEnumerable<INavigation> expansionPath, bool optional)
-        {
-            if (expansionPath.Count() == 0)
-            {
-                return null;
-            }
-
-            var navigation = expansionPath.First();
-            optional = optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
-            var result = new NavigationTreeNode
-            {
-                Navigation = navigation,
-                Optional = optional,
-                Children = new List<NavigationTreeNode>(),
-                //FromMappings = new List<List<string>>() { new List<string>() },
-                //ToMapping = new List<string>(),
-                Expanded = false,
-            };
-
-            var child = Create(expansionPath.Skip(1), optional);
-            if (child != null)
-            {
-                result.Children.Add(child);
-                child.Parent = result;
-            }
-
-            return result;
-        }
-
-        public bool Contains(NavigationTreeNode other)
-        {
-            if (other.Navigation != Navigation)
-            {
-                return false;
-            }
-
-            return other.Children.All(oc => Children.Any(c => c.Contains(oc)));
-        }
-
-        public bool TryCombine(NavigationTreeNode other)
-        {
-            // TODO: combine "Expanded" nodes also? if either NavigationTreeNode is expanded, the result should be as well
-            if (other.Navigation != Navigation)
-            {
-                return false;
-            }
-
-            foreach (var otherChild in other.Children)
-            {
-                var success = false;
-                foreach (var child in Children)
-                {
-                    if (!success)
-                    {
-                        success = child.TryCombine(otherChild);
-                    }
-                }
-
-                if (!success)
-                {
-                    Children.Add(otherChild);
-                    otherChild.Parent = this;
-                }
-            }
-
-            return true;
-        }
-    }
-
-    public class NavigationTreeNode2
-    {
-        private NavigationTreeNode2(
+        private NavigationTreeNode(
             [NotNull] INavigation navigation,
-            [NotNull] NavigationTreeNode2 parent,
+            [NotNull] NavigationTreeNode parent,
             bool optional)
         {
             Check.NotNull(navigation, nameof(navigation));
@@ -282,7 +174,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             }
         }
 
-        private NavigationTreeNode2(
+        private NavigationTreeNode(
             List<string> fromMapping,
             bool optional)
         {
@@ -294,14 +186,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         public INavigation Navigation { get; private set; }
         public bool Optional { get; private set; }
-        public NavigationTreeNode2 Parent { get; private set; }
-        public List<NavigationTreeNode2> Children { get; private set; } = new List<NavigationTreeNode2>();
+        public NavigationTreeNode Parent { get; private set; }
+        public List<NavigationTreeNode> Children { get; private set; } = new List<NavigationTreeNode>();
         public bool Expanded { get; set; }
 
         public List<List<string>> FromMappings { get; set; } = new List<List<string>>();
         public List<string> ToMapping { get; set; }
 
-        public static NavigationTreeNode2 CreateRoot(
+        public static NavigationTreeNode CreateRoot(
             [NotNull] SourceMapping sourceMapping,
             [NotNull] List<string> fromMapping,
             bool optional)
@@ -309,13 +201,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             Check.NotNull(sourceMapping, nameof(sourceMapping));
             Check.NotNull(fromMapping, nameof(fromMapping));
 
-            return sourceMapping.NavigationTree ?? new NavigationTreeNode2(fromMapping, optional);
+            return sourceMapping.NavigationTree ?? new NavigationTreeNode(fromMapping, optional);
         }
 
-        public static NavigationTreeNode2 Create(
+        public static NavigationTreeNode Create(
             [NotNull] SourceMapping sourceMapping,
             [NotNull] INavigation navigation,
-            [NotNull] NavigationTreeNode2 parent)
+            [NotNull] NavigationTreeNode parent)
         {
             Check.NotNull(sourceMapping, nameof(sourceMapping));
             Check.NotNull(navigation, nameof(navigation));
@@ -330,15 +222,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             // if (any) parent is optional, all children must be optional also
             // TODO: what about query filters?
             var optional = parent.Optional || !navigation.ForeignKey.IsRequired || !navigation.IsDependentToPrincipal();
-            var result = new NavigationTreeNode2(navigation, parent, optional);
+            var result = new NavigationTreeNode(navigation, parent, optional);
             parent.Children.Add(result);
 
             return result;
         }
 
-        public List<NavigationTreeNode2> Flatten()
+        public List<NavigationTreeNode> Flatten()
         {
-            var result = new List<NavigationTreeNode2>();
+            var result = new List<NavigationTreeNode>();
             result.Add(this);
 
             foreach (var child in Children)

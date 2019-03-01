@@ -11,23 +11,12 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
     {
         protected override Expression VisitExtension(Expression extensionExpression)
         {
-            if (extensionExpression is NavigationBindingExpression2 navigationBindingExpression2)
+            if (extensionExpression is NavigationBindingExpression navigationBindingExpression2)
             {
-                // TODO: move to binder itself, this implementaion detail shouldn't leak to the base class!!!!
-
-                // navigation binding would convert "naked" ParameterExpression into NavigationBindingExpression
-                // in that case, we want to unwrap the root
-                //var newRootParameter = navigationBindingExpression2.RootParameter;
-                //var newRootParameterVisitResult = Visit(navigationBindingExpression2.RootParameter);
-                //if (newRootParameterVisitResult is NavigationBindingExpression2 nbe)
-                //{
-                //    newRootParameter = nbe.RootParameter;
-                //}
-
                 var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression2.RootParameter);
 
                 return newRootParameter != navigationBindingExpression2.RootParameter
-                    ? new NavigationBindingExpression2(
+                    ? new NavigationBindingExpression(
                         newRootParameter,
                         navigationBindingExpression2.NavigationTreeNode,
                         navigationBindingExpression2.EntityType,
@@ -44,27 +33,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     ? new CustomRootExpression(newRootParameter, customRootExpression.Mapping, customRootExpression.Type)
                     : customRootExpression;
             }
-
-            //if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
-            //{
-            //    var newRootParameter = navigationBindingExpression.RootParameter;
-            //    var newRootParameterVisitResult = Visit(navigationBindingExpression.RootParameter);
-            //    if (newRootParameterVisitResult is NavigationBindingExpression nbe)
-            //    {
-            //        newRootParameter = nbe.RootParameter;
-            //    }
-
-            //    var newOperand = Visit(navigationBindingExpression.Operand);
-
-            //    return newRootParameter != navigationBindingExpression.RootParameter || newOperand != navigationBindingExpression.Operand
-            //        ? new NavigationBindingExpression(
-            //            newOperand,
-            //            newRootParameter,
-            //            navigationBindingExpression.Navigations.ToList(),
-            //            navigationBindingExpression.EntityType,
-            //            navigationBindingExpression.SourceMapping)
-            //        : navigationBindingExpression;
-            //}
 
             if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
             {
