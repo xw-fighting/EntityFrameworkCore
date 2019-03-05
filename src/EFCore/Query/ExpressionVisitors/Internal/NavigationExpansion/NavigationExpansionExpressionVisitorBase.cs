@@ -34,6 +34,15 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     : customRootExpression;
             }
 
+            if (extensionExpression is CustomRootExpression2 customRootExpression2)
+            {
+                var newRoot = Visit(customRootExpression2.Root);
+
+                return newRoot != customRootExpression2.Root
+                    ? new CustomRootExpression2(newRoot, customRootExpression2.Mapping, customRootExpression2.Type)
+                    : customRootExpression2;
+            }
+
             if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
             {
                 var newOperand = Visit(navigationExpansionExpression.Operand);

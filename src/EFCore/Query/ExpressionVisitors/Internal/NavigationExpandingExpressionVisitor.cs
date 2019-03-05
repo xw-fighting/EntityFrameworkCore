@@ -125,6 +125,38 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         public readonly TInner Inner;
     }
 
+    public readonly struct TransparentIdentifier2<TOuter, TInner>
+    {
+        [UsedImplicitly]
+        public TransparentIdentifier2(TOuter outer, TInner inner)
+        {
+            Outer = outer;
+            Inner = inner;
+        }
+
+        [UsedImplicitly]
+        public readonly TOuter Outer;
+
+        [UsedImplicitly]
+        public readonly TInner Inner;
+    }
+
+    public readonly struct TransparentIdentifierGJ<TOuter, TInner>
+    {
+        [UsedImplicitly]
+        public TransparentIdentifierGJ(TOuter outer, TInner inner)
+        {
+            Outer = outer;
+            Inner = inner;
+        }
+
+        [UsedImplicitly]
+        public readonly TOuter Outer;
+
+        [UsedImplicitly]
+        public readonly TInner Inner;
+    }
+
     public class NavigationExpander
     {
         private IModel _model;

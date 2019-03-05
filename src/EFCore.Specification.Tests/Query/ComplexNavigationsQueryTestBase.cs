@@ -6043,6 +6043,251 @@ namespace Microsoft.EntityFrameworkCore.Query
         }
 
         [ConditionalFact]
+        public virtual void GroupJoin1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo on l1.Id equals l2.Level1_Optional_Id into grouping
+                            from l2 in grouping.DefaultIfEmpty()
+                            select new { l1, l2 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { o, i };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne/*.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")*/
+                            join i in ctx.LevelTwo/*.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar")*/ on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o.OneToOne_Optional_FK1/*.OneToOne_Required_PK2*/, inner = i/*.OneToOne_Required_FK2*/ };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo/*.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar")*/ on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o.OneToOne_Optional_FK1/*.OneToOne_Required_PK2*/, inner = i/*.OneToOne_Required_FK2*/ };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin5()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo/*.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar")*/ on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o.OneToOne_Optional_FK1.OneToOne_Required_PK2, inner = i/*.OneToOne_Required_FK2*/ };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin6()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne//.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo/*.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar")*/ on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o/*.OneToOne_Optional_FK1.OneToOne_Required_PK2*/, inner = i.OneToOne_Required_FK2 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin7()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne//.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o/*.OneToOne_Optional_FK1.OneToOne_Required_PK2*/, inner = i/*.OneToOne_Required_FK2*/ };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin8()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne//.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o/*.OneToOne_Optional_FK1.OneToOne_Required_PK2*/, inner = i.OneToOne_Required_FK2 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin9()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne.Where(l1 => l1.OneToOne_Optional_FK1.Name != "Foo")
+                            join i in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on o.Id equals i.Level1_Optional_Id into grouping
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o.OneToOne_Optional_FK1.OneToOne_Required_PK2, inner = i.OneToOne_Required_FK2 };
+
+                var result = query.ToList();
+            }
+        }
+        
+        [ConditionalFact]
+        public virtual void GroupJoin10()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from o in ctx.LevelOne
+                            join i in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on o.Id equals i.Level1_Optional_Id into grouping
+                            where o.OneToOne_Optional_FK1.Name != "Foo"
+                            from i in grouping.DefaultIfEmpty()
+                            select new { outer = o.OneToOne_Optional_FK1.OneToOne_Required_PK2, inner = i.OneToOne_Required_FK2 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin11()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo on l1.Id equals l2.Id into grouping1
+                            from l2 in grouping1.DefaultIfEmpty()
+                            join l3 in ctx.LevelThree on l2.Id equals l3.Id into grouping2
+                            from l3 in grouping2.DefaultIfEmpty()
+                            select new { l1, l2, l3 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin12()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on l1.Id equals l2.Id into grouping1
+                            from l2 in grouping1.DefaultIfEmpty()
+                            join l3 in ctx.LevelThree on l2.Id equals l3.Id into grouping2
+                            from l3 in grouping2.DefaultIfEmpty()
+                            select new { l1, l2, l3 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin13()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_FK1.Name)
+                            join l2 in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on l1.Id equals l2.Id into grouping1
+                            from l2 in grouping1.DefaultIfEmpty()
+                            join l3 in ctx.LevelThree.Select(l3 => l3.OneToOne_Required_FK3) on l2.Id equals l3.Id into grouping2
+                            from l3 in grouping2.DefaultIfEmpty()
+                            select new { l1.OneToOne_Optional_FK1.OneToOne_Optional_FK2, l2, l3.OneToOne_Optional_PK_Inverse4 };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void GroupJoin14()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_FK1.Name)
+                            join l2 in ctx.LevelTwo.Where(l2 => l2.OneToOne_Required_FK2.Name != "Bar") on l1.Id equals l2.Id into grouping1
+                            from l2 in grouping1.DefaultIfEmpty()
+                            join l3 in ctx.LevelThree.Select(l3 => l3.OneToOne_Required_FK3) on l2.Id equals l3.Id into grouping2
+                            from l3 in grouping2.DefaultIfEmpty()
+                            select new { l1.OneToOne_Optional_FK1.OneToOne_Optional_FK2, l2, l3.OneToMany_Required_Self4 };  // <- collection here causes problems!
+
+                var result = query.ToList();
+            }
+        }
+
+
+
+
+        [ConditionalFact]
+        public virtual void GroupJoin_client1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo on l1.Id equals l2.Level1_Optional_Id into grouping
+                            select grouping.Where(g => g.OneToOne_Optional_FK2.Name != "Foo");
+
+                var result = query.ToList();
+            }
+        }
+
+        public virtual void GroupJoin_client2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo.Where(l2 => l2.OneToOne_Optional_FK2.Name != "Foo") on l1.Id equals l2.Level1_Optional_Id into grouping
+                            select grouping.Select(g => g.OneToOne_Optional_FK2.Name);
+
+                var result = query.ToList();
+            }
+        }
+
+        public virtual void GroupJoin_client3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = from l1 in ctx.LevelOne
+                            join l2 in ctx.LevelTwo.Where(l2 => l2.OneToOne_Optional_FK2.Name != "Foo") on l1.Id equals l2.Level1_Optional_Id into grouping
+                            select new { l1, foo = grouping.Select(g => g.OneToOne_Optional_FK2.OneToOne_Optional_PK3.Name).FirstOrDefault() };
+
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
         public virtual void ComplexWhere()
         {
             using (var ctx = CreateContext())

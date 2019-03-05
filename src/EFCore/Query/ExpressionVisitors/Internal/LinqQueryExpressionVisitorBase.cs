@@ -42,6 +42,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
 
         protected MethodInfo QueryableOfType { get; set; }
 
+        protected MethodInfo QueryableDefaultIfEmpty { get; set; }
+        protected MethodInfo QueryableDefaultIfEmptyWithDefaultValue { get; set; }
+
         protected MethodInfo EnumerableWhereMethodInfo { get; set; }
         protected MethodInfo EnumerableSelectMethodInfo { get; set; }
 
@@ -93,6 +96,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
             QueryableContains = queryableMethods.Where(m => m.Name == nameof(Queryable.Contains) && m.GetParameters().Count() == 2).Single();
 
             QueryableOfType = queryableMethods.Where(m => m.Name == nameof(Queryable.OfType) && m.GetParameters().Count() == 1).Single();
+
+            QueryableDefaultIfEmpty = queryableMethods.Where(m => m.Name == nameof(Queryable.DefaultIfEmpty) && m.GetParameters().Count() == 1).Single();
+            QueryableDefaultIfEmptyWithDefaultValue = queryableMethods.Where(m => m.Name == nameof(Queryable.DefaultIfEmpty) && m.GetParameters().Count() == 2).Single();
 
             var enumerableMethods = typeof(Enumerable).GetMethods().ToList();
 

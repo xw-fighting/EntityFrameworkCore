@@ -34,6 +34,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 return customRootExpression;
             }
 
+            if (extensionExpression is CustomRootExpression2 customRootExpression2)
+            {
+                return customRootExpression2;
+            }
+
             return base.VisitExtension(extensionExpression);
         }
 

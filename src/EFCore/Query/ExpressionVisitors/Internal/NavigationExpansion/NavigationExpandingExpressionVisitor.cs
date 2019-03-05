@@ -34,6 +34,30 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 return customRootExpression;
             }
 
+            if (extensionExpression is CustomRootExpression2 customRootExpression2)
+            {
+                //if (customRootExpression2.Root is NavigationExpansionExpression navigationExpansionExpression)
+                //{
+                //    if (customRootExpression2.Mapping.Any())
+                //    {
+                //        var result = navigationExpansionExpression.Operand;
+
+                //        // TODO: DRY - logic copied from NavigationTreeNode - is there better common place for this?
+                //        foreach (var accessorPathElement in customRootExpression2.Mapping)
+                //        {
+                //            result = Expression.PropertyOrField(result, accessorPathElement);
+                //        }
+
+                //        return new NavigationExpansionExpression(result, navigationExpansionExpression.State, navigationExpansionExpression.Type);
+
+                //    }
+                
+                //    return navigationExpansionExpression;
+                //}
+
+                return customRootExpression2;
+            }
+
             return base.VisitExtension(extensionExpression);
         }
 
@@ -53,6 +77,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 case nameof(Queryable.ThenByDescending):
                     return ProcessOrderBy(methodCallExpression);
 
+                case nameof(Queryable.DefaultIfEmpty):
+                    return ProcessDefaultIfEmpty(methodCallExpression);
+
                 case nameof(Queryable.Distinct):
                 case nameof(Queryable.Skip):
                 case nameof(Queryable.Take):
@@ -61,7 +88,6 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 case nameof(Queryable.Single):
                 case nameof(Queryable.SingleOrDefault):
                 case nameof(Queryable.Any):
-                case nameof(Queryable.DefaultIfEmpty):
                 //case nameof(Queryable.Contains):
                 case nameof(Queryable.OfType):
                 case "AsTracking":
@@ -70,6 +96,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 case nameof(Queryable.Join):
                     return ProcessJoin(methodCallExpression);
+
+                case nameof(Queryable.GroupJoin):
+                    return ProcessGroupJoin(methodCallExpression);
 
                 case nameof(Queryable.SelectMany):
                     return ProcessSelectMany(methodCallExpression);
@@ -193,6 +222,68 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 methodCallExpression.Type);
         }
 
+        private Expression ProcessDefaultIfEmpty(MethodCallExpression methodCallExpression)
+        {
+            // TODO: clean this up, i.e. in top level switch statement pick method based on method info, not only the name
+            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableDefaultIfEmptyWithDefaultValue))
+            {
+                return ProcessTerminatingOperation(methodCallExpression);
+            }
+
+            var source = Visit(methodCallExpression.Arguments[0]);
+
+            // TODO: huge hack!!! also need to handle nested case - custom root inside custom root
+            if (source is CustomRootExpression2 customRootExpression2)
+            {
+                if (customRootExpression2.Root is NavigationExpansionExpression nee)
+                {
+                    if (customRootExpression2.Mapping.Any())
+                    {
+                        var result = nee.Operand;
+
+                        // TODO: DRY - logic copied from NavigationTreeNode - is there better common place for this?
+                        foreach (var accessorPathElement in customRootExpression2.Mapping)
+                        {
+                            result = Expression.PropertyOrField(result, accessorPathElement);
+                        }
+
+                        source = new NavigationExpansionExpression(result, nee.State, nee.Type);
+
+                    }
+                    else
+                    {
+                        source = nee;
+                    }
+                }
+                else
+                {
+                    source = customRootExpression2;
+                }
+            }
+
+            var state = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = Expression.Parameter(
+                    source.Type.GetElementType() ?? source.Type.GetGenericArguments()[0])
+            };
+
+            if (source is NavigationExpansionExpression navigationExpansionExpression)
+            {
+                source = navigationExpansionExpression.Operand;
+                state = AdjustState(state, navigationExpansionExpression);
+            }
+
+            var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(state.CurrentParameter.Type);
+            var rewritten = Expression.Call(
+                newMethodInfo,
+                source);
+
+            return new NavigationExpansionExpression(
+                rewritten,
+                state,
+                methodCallExpression.Type);
+        }
+
         private Expression ProcessSelectMany(MethodCallExpression methodCallExpression)
         {
             var outerSource = Visit(methodCallExpression.Arguments[0]);
@@ -212,6 +303,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             if (collectionSelectorResult.lambdaBody is NavigationExpansionExpression collectionSelectorNavigationExpansionExpression)
             {
                 var collectionSelectorState = collectionSelectorNavigationExpansionExpression.State;
+                var collectionSelectorLambdaBody = collectionSelectorNavigationExpansionExpression.Operand;
 
                 if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
                 {
@@ -221,10 +313,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     {
                         var newOuterParameter = Expression.Parameter(outerState.CurrentParameter.Type, methodCallExpression.Arguments[2].UnwrapQuote().Parameters[0].Name);
                         outerState.PendingSelector = (LambdaExpression)new ExpressionReplacingVisitor(outerState.CurrentParameter, newOuterParameter).Visit(outerState.PendingSelector);
+                        collectionSelectorLambdaBody = new ExpressionReplacingVisitor(outerState.CurrentParameter, newOuterParameter).Visit(collectionSelectorLambdaBody);
                         outerState.CurrentParameter = newOuterParameter;
                     }
-
-                    // TODO: remap the collection result selector on top of the new pending selector?????
 
                     if (collectionSelectorState.CurrentParameter.Name == null
                         && collectionSelectorState.CurrentParameter.Name != methodCallExpression.Arguments[2].UnwrapQuote().Parameters[1].Name)
@@ -253,7 +344,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
                 var newCollectionSelectorLambda = Expression.Lambda(
                     collectionSelectorLambdaType,
-                    collectionSelectorNavigationExpansionExpression.Operand,
+                    collectionSelectorLambdaBody,
                     outerState.CurrentParameter);
 
                 newCollectionSelectorLambda = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(outerState.CurrentParameter).Visit(newCollectionSelectorLambda);
@@ -381,7 +472,159 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
         private Expression ProcessGroupJoin(MethodCallExpression methodCallExpression)
         {
-            return methodCallExpression;
+            var outerSource = Visit(methodCallExpression.Arguments[0]);
+            var innerSource = Visit(methodCallExpression.Arguments[1]);
+
+            var outerKeySelector = methodCallExpression.Arguments[2].UnwrapQuote();
+            var innerKeySelector = methodCallExpression.Arguments[3].UnwrapQuote();
+            var resultSelector = methodCallExpression.Arguments[4].UnwrapQuote();
+
+            var outerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = outerKeySelector.Parameters[0]
+            };
+
+            var innerState = new NavigationExpansionExpressionState
+            {
+                CurrentParameter = innerKeySelector.Parameters[0]
+            };
+
+            if (outerSource is NavigationExpansionExpression outerNavigationExpansionExpression)
+            {
+                outerSource = outerNavigationExpansionExpression.Operand;
+                outerState = AdjustState(outerState, outerNavigationExpansionExpression);
+            }
+
+            if (innerSource is NavigationExpansionExpression innerNavigationExpansionExpression)
+            {
+                innerSource = innerNavigationExpansionExpression.Operand;
+                innerState = AdjustState(innerState, innerNavigationExpansionExpression);
+            }
+
+            var outerResult = FindAndApplyNavigations(outerSource, outerKeySelector, outerState);
+            var innerResult = FindAndApplyNavigations(innerSource, innerKeySelector, innerState);
+
+            var newOuterKeySelectorBody = new NavigationPropertyUnbindingBindingExpressionVisitor(outerResult.state.CurrentParameter).Visit(outerResult.lambdaBody);
+            var newInnerKeySelectorBody = new NavigationPropertyUnbindingBindingExpressionVisitor(innerResult.state.CurrentParameter).Visit(innerResult.lambdaBody);
+
+            //-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+            var resultSelectorBody = resultSelector.Body;
+            var remappedResultSelector = ExpressionExtensions.CombineAndRemapLambdas(outerState.PendingSelector, resultSelector, resultSelector.Parameters[0]);
+
+            var groupingParameter = resultSelector.Parameters[1];
+            var newGroupingParameter = Expression.Parameter(typeof(IEnumerable<>).MakeGenericType(innerState.CurrentParameter.Type), "new_" + groupingParameter.Name);
+
+            var groupingMapping = new List<string> { nameof(TransparentIdentifierGJ<object, object>.Inner) };
+            var groupingState = innerState;/* new NavigationExpansionExpressionState
+            {
+                ApplyPendingSelector = innerState.ApplyPendingSelector,
+                CurrentParameter = innerState.CurrentParameter,
+                CustomRootMappings = innerState.CustomRootMappings.ToList(),
+                PendingSelector = innerState.PendingSelector,
+                SourceMappings = innerState.SourceMappings.ToList(),
+            };
+
+            innerState.CustomRootMappings.Add(groupingMapping);*/
+
+
+            // TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            // need to manipulate the state, not simply copy it over to the grouping
+            // prolly generate completely new tree - mappings for the grouping should have the Inner added to them,
+            // basically those should be 2 different mappings
+
+            //fix that stuff!!!
+
+            var newGrouping = new CustomRootExpression2(
+                    new NavigationExpansionExpression(newGroupingParameter, innerState, groupingParameter.Type),
+                    groupingMapping,
+                    groupingParameter.Type);
+
+            var remappedResultSelectorBody = new ExpressionReplacingVisitor(groupingParameter, newGrouping).Visit(remappedResultSelector.Body);
+            //remappedResultSelector = Expression.Lambda(remappedResultSelectorBody, outerState.CurrentParameter, newGroupingParameter);
+
+            foreach (var outerCustomRootMapping in outerState.CustomRootMappings)
+            {
+                outerCustomRootMapping.Insert(0, nameof(TransparentIdentifierGJ<object, object>.Outer));
+            }
+
+            foreach (var outerSourceMapping in outerState.SourceMappings)
+            {
+                foreach (var navigationTreeNode in outerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
+                {
+                    navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifierGJ<object, object>.Outer));
+                    foreach (var fromMapping in navigationTreeNode.FromMappings)
+                    {
+                        fromMapping.Insert(0, nameof(TransparentIdentifierGJ<object, object>.Outer));
+                    }
+                }
+            }
+
+            //foreach (var innerCustomRootMapping in innerState.CustomRootMappings)
+            //{
+            //    innerCustomRootMapping.Insert(0, nameof(TransparentIdentifierGJ<object, object>.InnerGJ));
+            //}
+
+
+            // TODO: hack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <- we prolly need this but commenting for now to see if maybe it works like this by chance
+
+
+            //foreach (var innerSourceMapping in innerState.SourceMappings)
+            //{
+            //    foreach (var navigationTreeNode in innerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
+            //    {
+            //        navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+            //        foreach (var fromMapping in navigationTreeNode.FromMappings)
+            //        {
+            //            fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+            //        }
+            //    }
+            //}
+
+            var resultType = typeof(TransparentIdentifierGJ<,>).MakeGenericType(outerState.CurrentParameter.Type, newGroupingParameter.Type);
+            var transparentIdentifierCtorInfo = resultType.GetTypeInfo().GetConstructors().Single();
+            var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
+
+            var newPendingSelectorBody = new ExpressionReplacingVisitor(outerState.CurrentParameter, transparentIdentifierParameter).Visit(remappedResultSelectorBody);
+            newPendingSelectorBody = new ExpressionReplacingVisitor(newGroupingParameter, transparentIdentifierParameter).Visit(newPendingSelectorBody);
+
+            var newState = new NavigationExpansionExpressionState
+            {
+                ApplyPendingSelector = true,
+                CurrentParameter = transparentIdentifierParameter,
+                CustomRootMappings = outerState.CustomRootMappings/*.Concat(innerState.CustomRootMappings)*/.ToList(),
+                PendingSelector = Expression.Lambda(newPendingSelectorBody, transparentIdentifierParameter),
+                SourceMappings = outerState.SourceMappings.ToList()//.Concat(innerState.SourceMappings).ToList()
+            };
+
+            newState.CustomRootMappings.Add(groupingMapping);
+
+            var lambda = Expression.Lambda(
+                Expression.New(transparentIdentifierCtorInfo, outerState.CurrentParameter, newGroupingParameter),
+                outerState.CurrentParameter,
+                newGroupingParameter);
+
+            var newMethodInfo = methodCallExpression.Method.GetGenericMethodDefinition().MakeGenericMethod(
+                outerResult.state.CurrentParameter.Type,
+                innerResult.state.CurrentParameter.Type,
+                outerResult.lambdaBody.Type,
+                lambda.Body.Type);
+
+            var rewritten = Expression.Call(
+                newMethodInfo,
+                outerResult.source,
+                innerResult.source,
+                Expression.Lambda(newOuterKeySelectorBody, outerResult.state.CurrentParameter),
+                Expression.Lambda(newInnerKeySelectorBody, innerResult.state.CurrentParameter),
+                lambda);
+
+            // TODO: expand navigations in the result selector of the GroupJoin!!!
+
+            return new NavigationExpansionExpression(
+                rewritten,
+                newState,
+                methodCallExpression.Type);
         }
 
         private bool IsQueryable(Type type)
@@ -898,41 +1141,75 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             var boundResultSelectorBody = outerBinder.Visit(remappedResultSelector.Body);
             boundResultSelectorBody = innerBinder.Visit(boundResultSelectorBody);
 
+            var processedCustomRootMappings = new List<List<string>>();
             foreach (var outerCustomRootMapping in outerState.CustomRootMappings)
             {
-                outerCustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                if (!processedCustomRootMappings.Contains(outerCustomRootMapping))
+                {
+                    processedCustomRootMappings.Add(outerCustomRootMapping);
+                    outerCustomRootMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Outer));
+                }
+                else
+                {
+                    throw new InvalidOperationException("duplicated mapping!");
+                }
             }
 
+            var processedSourceMappings = new List<SourceMapping>();
             foreach (var outerSourceMapping in outerState.SourceMappings)
             {
-                foreach (var navigationTreeNode in outerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
+                if (!processedSourceMappings.Contains(outerSourceMapping))
                 {
-                    navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
-                    foreach (var fromMapping in navigationTreeNode.FromMappings)
+                    processedSourceMappings.Add(outerSourceMapping);
+                    foreach (var navigationTreeNode in outerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
                     {
-                        fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Outer));
+                        navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Outer));
+                        foreach (var fromMapping in navigationTreeNode.FromMappings)
+                        {
+                            fromMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Outer));
+                        }
                     }
+                }
+                else
+                {
+                    throw new InvalidOperationException("duplicated mapping!");
                 }
             }
 
             foreach (var innerCustomRootMapping in innerState.CustomRootMappings)
             {
-                innerCustomRootMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                if (!processedCustomRootMappings.Contains(innerCustomRootMapping))
+                {
+                    processedCustomRootMappings.Add(innerCustomRootMapping);
+                    innerCustomRootMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Inner));
+                }
+                else
+                {
+                    throw new InvalidOperationException("duplicated mapping!");
+                }
             }
 
             foreach (var innerSourceMapping in innerState.SourceMappings)
             {
-                foreach (var navigationTreeNode in innerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
+                if (!processedSourceMappings.Contains(innerSourceMapping))
                 {
-                    navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
-                    foreach (var fromMapping in navigationTreeNode.FromMappings)
+                    processedSourceMappings.Add(innerSourceMapping);
+                    foreach (var navigationTreeNode in innerSourceMapping.NavigationTree.Flatten().Where(n => n.Expanded))
                     {
-                        fromMapping.Insert(0, nameof(TransparentIdentifier<object, object>.Inner));
+                        navigationTreeNode.ToMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Inner));
+                        foreach (var fromMapping in navigationTreeNode.FromMappings)
+                        {
+                            fromMapping.Insert(0, nameof(TransparentIdentifier2<object, object>.Inner));
+                        }
                     }
+                }
+                else
+                {
+                    throw new InvalidOperationException("duplicated mapping!");
                 }
             }
 
-            var resultType = typeof(TransparentIdentifier<,>).MakeGenericType(outerState.CurrentParameter.Type, innerState.CurrentParameter.Type);
+            var resultType = typeof(TransparentIdentifier2<,>).MakeGenericType(outerState.CurrentParameter.Type, innerState.CurrentParameter.Type);
             var transparentIdentifierCtorInfo = resultType.GetTypeInfo().GetConstructors().Single();
             var transparentIdentifierParameter = Expression.Parameter(resultType, "ti");
 
@@ -943,9 +1220,9 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 ApplyPendingSelector = true,
                 CurrentParameter = transparentIdentifierParameter,
-                CustomRootMappings = outerState.CustomRootMappings.Concat(innerState.CustomRootMappings).ToList(),
+                CustomRootMappings = processedCustomRootMappings,//outerState.CustomRootMappings.Concat(innerState.CustomRootMappings).ToList(),
                 PendingSelector = Expression.Lambda(newPendingSelectorBody, transparentIdentifierParameter),
-                SourceMappings = outerState.SourceMappings.Concat(innerState.SourceMappings).ToList()
+                SourceMappings = processedSourceMappings//outerState.SourceMappings.Concat(innerState.SourceMappings).ToList()
             };
 
             var lambda = Expression.Lambda(
