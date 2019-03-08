@@ -6297,6 +6297,155 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
+        [ConditionalFact]
+        public virtual void NavExpansion_subquery1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => ctx.LevelOne.OrderBy(x => x.OneToOne_Required_FK1.Id).FirstOrDefault().OneToOne_Required_FK1.Name);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void NavExpansion_subquery2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => ctx.LevelOne.OrderBy(x => x.OneToOne_Required_FK1.Id).Select(x => new { foo = x, bar = x }).FirstOrDefault().foo.OneToOne_Required_FK1.Name);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.OrderBy(l1 => l1.Id).FirstOrDefault(x => x.Name != "Foo");
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.Id).FirstOrDefault(x => x.Name != "Foo").OneToOne_Optional_FK1);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.Id).FirstOrDefault(x => x.Name != "Foo").OneToOne_Optional_FK1.Id);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.Id).FirstOrDefault(x => x.Name != "Foo").OneToOne_Optional_FK1.OneToOne_Required_FK2.Name);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation5()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_FK1.Id).FirstOrDefault(x => x.Name != "Foo").OneToOne_Optional_FK1.Name);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation_collection1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_FK1.Id).FirstOrDefault(x => x.Name != "Foo").OneToMany_Optional1);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_terminating_operation_collection2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_FK1.Id).FirstOrDefault(x => x.Name != "Foo").OneToMany_Optional1.Where(l2 => l2.Name != "Bar"));
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_collection1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.Id).FirstOrDefault().OneToMany_Optional1.Where(l2 => l2.Name != "Bar"));
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_collection2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.Id).Select(l1 => new { foo = l1 }).FirstOrDefault().foo.OneToMany_Optional1.Where(l2 => l2.Name != "Bar"));
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_collection3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_PK1.Id).Select(l1 => new { foo = l1 }).FirstOrDefault().foo.OneToMany_Optional1.Where(l2 => l2.Name != "Bar").Select(l2 => l2.Name));
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_expansion_collection4()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(outer => ctx.LevelOne.OrderBy(l1 => l1.OneToOne_Optional_PK1.Id).Select(l1 => new { foo = l1 }).FirstOrDefault().foo.OneToMany_Optional1.Where(l2 => l2.Name != "Bar").Select(l2 => l2.Name).FirstOrDefault());
+                var result = query.ToList();
+            }
+        }
+
+
+        [ConditionalFact]
+        public virtual void Fubar()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.All(x => x.Name != "Foo");
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Fubar2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.LevelOne.Select(l1 => l1.OneToMany_Optional1.All(l2 => l2.OneToOne_Optional_FK2.Name != "Foo")).ToList();
+            }
+        }
+
+
         // TODO: what about case where collection selector is correlated with the parameter from the outside????
     }
 }

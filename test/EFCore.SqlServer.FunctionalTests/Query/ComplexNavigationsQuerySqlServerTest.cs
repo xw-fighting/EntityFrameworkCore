@@ -4618,6 +4618,153 @@ WHERE (
 ) > 0");
         }
 
+        public override void NavExpansion_subquery1()
+        {
+            base.NavExpansion_subquery1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_terminating_operation1()
+        {
+            base.Nav_expansion_terminating_operation1();
+
+            AssertSql(
+                @"SELECT TOP(1) [l1].[Id], [l1].[Date], [l1].[Name], [l1].[OneToMany_Optional_Self_Inverse1Id], [l1].[OneToMany_Required_Self_Inverse1Id], [l1].[OneToOne_Optional_Self1Id]
+FROM [LevelOne] AS [l1]
+WHERE ([l1].[Name] <> N'Foo') OR [l1].[Name] IS NULL
+ORDER BY [l1].[Id]");
+        }
+
+        public override void Nav_expansion_terminating_operation2()
+        {
+            base.Nav_expansion_terminating_operation2();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_terminating_operation3()
+        {
+            base.Nav_expansion_terminating_operation3();
+
+            AssertSql(
+                @"SELECT COALESCE((
+    SELECT TOP(1) [l1.OneToOne_Optional_FK1].[Id]
+    FROM [LevelOne] AS [l1]
+    LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_FK1] ON [l1].[Id] = [l1.OneToOne_Optional_FK1].[Level1_Optional_Id]
+    WHERE ([l1].[Name] <> N'Foo') OR [l1].[Name] IS NULL
+    ORDER BY [l1].[Id]
+), 0)
+FROM [LevelOne] AS [outer]");
+        }
+
+        public override void Nav_expansion_terminating_operation4()
+        {
+            base.Nav_expansion_terminating_operation4();
+
+            AssertSql(
+                @"SELECT (
+    SELECT TOP(1) [l1.OneToOne_Optional_FK1.OneToOne_Required_FK2].[Name]
+    FROM [LevelOne] AS [l1]
+    LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_FK1] ON [l1].[Id] = [l1.OneToOne_Optional_FK1].[Level1_Optional_Id]
+    LEFT JOIN [LevelThree] AS [l1.OneToOne_Optional_FK1.OneToOne_Required_FK2] ON [l1.OneToOne_Optional_FK1].[Id] = [l1.OneToOne_Optional_FK1.OneToOne_Required_FK2].[Level2_Required_Id]
+    WHERE ([l1].[Name] <> N'Foo') OR [l1].[Name] IS NULL
+    ORDER BY [l1].[Id]
+)
+FROM [LevelOne] AS [outer]");
+        }
+
+        public override void Nav_expansion_terminating_operation5()
+        {
+            base.Nav_expansion_terminating_operation5();
+
+            AssertSql(
+                @"SELECT (
+    SELECT TOP(1) [l1.OneToOne_Optional_FK1].[Name]
+    FROM [LevelOne] AS [l1]
+    LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_FK1] ON [l1].[Id] = [l1.OneToOne_Optional_FK1].[Level1_Optional_Id]
+    WHERE ([l1].[Name] <> N'Foo') OR [l1].[Name] IS NULL
+    ORDER BY [l1.OneToOne_Optional_FK1].[Id]
+)
+FROM [LevelOne] AS [outer]");
+        }
+
+        public override void Nav_expansion_terminating_operation_collection1()
+        {
+            base.Nav_expansion_terminating_operation_collection1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_terminating_operation_collection2()
+        {
+            base.Nav_expansion_terminating_operation_collection2();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_collection1()
+        {
+            base.Nav_expansion_collection1();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_collection2()
+        {
+            base.Nav_expansion_collection2();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_collection3()
+        {
+            base.Nav_expansion_collection3();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Nav_expansion_collection4()
+        {
+            base.Nav_expansion_collection4();
+
+            AssertSql(
+                @"SELECT (
+    SELECT TOP(1) [l].[Name]
+    FROM [LevelTwo] AS [l]
+    WHERE ([l].[OneToMany_Optional_Inverse2Id] = (
+        SELECT TOP(1) [l1].[Id]
+        FROM [LevelOne] AS [l1]
+        LEFT JOIN [LevelTwo] AS [l1.OneToOne_Optional_PK1] ON [l1].[Id] = [l1.OneToOne_Optional_PK1].[OneToOne_Optional_PK_Inverse2Id]
+        ORDER BY [l1.OneToOne_Optional_PK1].[Id]
+    )) AND (([l].[Name] <> N'Bar') OR [l].[Name] IS NULL)
+)
+FROM [LevelOne] AS [outer]");
+        }
+
+        public override void Fubar()
+        {
+            base.Fubar();
+
+            AssertSql(
+                @"");
+        }
+
+        public override void Fubar2()
+        {
+            base.Fubar2();
+
+            AssertSql(
+                @"");
+        }
+
         private void AssertSql(params string[] expected)
         {
             Fixture.TestSqlLoggerFactory.AssertBaseline(expected);

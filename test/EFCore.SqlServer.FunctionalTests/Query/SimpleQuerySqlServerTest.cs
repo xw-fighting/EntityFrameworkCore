@@ -497,17 +497,17 @@ FROM (
     FROM [Employees] AS [e]
 ) AS [t]",
                 //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]",
+                @"SELECT TOP(1) [e1].[FirstName]
+FROM [Employees] AS [e1]
+ORDER BY [e1].[EmployeeID]",
                 //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]",
+                @"SELECT TOP(1) [e1].[FirstName]
+FROM [Employees] AS [e1]
+ORDER BY [e1].[EmployeeID]",
                 //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]");
+                @"SELECT TOP(1) [e1].[FirstName]
+FROM [Employees] AS [e1]
+ORDER BY [e1].[EmployeeID]");
         }
 
         public override async Task Where_query_composition2_FirstOrDefault(bool isAsync)
@@ -540,19 +540,12 @@ SELECT [t].[EmployeeID], [t].[City], [t].[Country], [t].[FirstName], [t].[Report
 FROM (
     SELECT TOP(@__p_0) [e].[EmployeeID], [e].[City], [e].[Country], [e].[FirstName], [e].[ReportsTo], [e].[Title]
     FROM [Employees] AS [e]
-) AS [t]",
-                //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]",
-                //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]",
-                //
-                @"SELECT TOP(1) [e0].[EmployeeID], [e0].[City], [e0].[Country], [e0].[FirstName], [e0].[ReportsTo], [e0].[Title]
-FROM [Employees] AS [e0]
-ORDER BY [e0].[EmployeeID]");
+) AS [t]
+WHERE [t].[FirstName] = (
+    SELECT TOP(1) [e0].[FirstName]
+    FROM [Employees] AS [e0]
+    ORDER BY [e0].[EmployeeID]
+)");
         }
 
         public override void Select_Subquery_Single()
@@ -2721,6 +2714,16 @@ FROM (
 ) AS [t]
 ORDER BY [t].[c]
 OFFSET @__p_1 ROWS");
+        }
+
+        public override async Task Where_Property_when_shadow(bool isAsync)
+        {
+            await base.Where_Property_when_shadow(isAsync);
+
+            AssertSql(
+                @"SELECT [e].[EmployeeID], [e].[City], [e].[Country], [e].[FirstName], [e].[ReportsTo], [e].[Title]
+FROM [Employees] AS [e]
+WHERE [e].[Title] = N'Sales Representative'");
         }
 
         public override void Selected_column_can_coalesce()

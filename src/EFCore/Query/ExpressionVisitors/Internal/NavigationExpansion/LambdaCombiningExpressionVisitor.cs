@@ -80,6 +80,11 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 : memberExpression;
         }
 
+        protected override Expression VisitExtension(Expression extensionExpression)
+        {
+            return base.VisitExtension(extensionExpression);
+        }
+
         private class ParameterReplacingExpressionVisitor : ExpressionVisitor
         {
             private ParameterExpression _parameterToReplace;

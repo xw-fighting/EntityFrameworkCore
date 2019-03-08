@@ -88,6 +88,34 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             Type = type;
         }
 
+        // TODO: HACK!!!
+        public Expression Unwrap()
+        {
+            if (Mapping.Count == 0)
+            {
+                return Root;
+            }
+
+            if (Root is NavigationExpansionExpression navigationExpansionExpression)
+            {
+                var newOperand = navigationExpansionExpression.Operand;
+                foreach (var mappingElement in Mapping)
+                {
+                    newOperand = PropertyOrField(newOperand, mappingElement);
+                }
+
+                return new NavigationExpansionExpression(newOperand, navigationExpansionExpression.State, navigationExpansionExpression.Type);
+            }
+
+            var result = Root;
+            foreach (var mappingElement in Mapping)
+            {
+                result = PropertyOrField(result, mappingElement);
+            }
+
+            return result;
+        }
+
         public void Print([NotNull] ExpressionPrinter expressionPrinter)
         {
             expressionPrinter.StringBuilder.Append("CUSTOM_ROOT(");

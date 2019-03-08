@@ -27,6 +27,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public ParameterExpression CurrentParameter { get; set; }
         public List<SourceMapping> SourceMappings { get; set; } = new List<SourceMapping>();
         public LambdaExpression PendingSelector { get; set; }
+        public MethodInfo PendingTerminatingOperator { get; set; }
         public bool ApplyPendingSelector { get; set; }
         public List<List<string>> CustomRootMappings { get; set; } = new List<List<string>>();
     }
@@ -46,7 +47,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
         public override bool CanReduce => true;
         public override Expression Reduce()
         {
-            if (!State.ApplyPendingSelector)
+            if (!State.ApplyPendingSelector
+                && State.PendingTerminatingOperator == null)
             {
                 // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations
                 if (Operand.Type != _returnType)
@@ -59,18 +61,27 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
 
             var result = Operand;
             var parameter = Parameter(result.Type.GetGenericArguments()[0]);
+            if (State.ApplyPendingSelector)
+            {
+                var pendingSelector = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(State.CurrentParameter).Visit(State.PendingSelector);
 
-            var pendingSelector = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(State.CurrentParameter).Visit(State.PendingSelector);
+                var pendingSelectMathod = result.Type.IsGenericType && (result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>) || result.Type.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
+                    ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)
+                    : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type);
 
-            var pendingSelectMathod = result.Type.IsGenericType && result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)
-                : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type);
+                result = Call(pendingSelectMathod, result, pendingSelector);
+                parameter = Parameter(result.Type.GetGenericArguments()[0]);
+            }
 
-            result = Call(pendingSelectMathod, result, pendingSelector);
-            parameter = Parameter(result.Type.GetGenericArguments()[0]);
+            if (State.PendingTerminatingOperator != null)
+            {
+                var terminatingOperatorMethodInfo = State.PendingTerminatingOperator.MakeGenericMethod(parameter.Type);
+
+                result = Call(terminatingOperatorMethodInfo, result);
+            }
 
             if (_returnType.IsGenericType && _returnType.GetGenericTypeDefinition() == typeof(IOrderedQueryable<>))
-            { 
+            {
                 var toOrderedMethodInfo = typeof(NavigationExpansionExpression).GetMethod(nameof(NavigationExpansionExpression.ToOrdered)).MakeGenericMethod(parameter.Type);
 
                 return Call(toOrderedMethodInfo, result);

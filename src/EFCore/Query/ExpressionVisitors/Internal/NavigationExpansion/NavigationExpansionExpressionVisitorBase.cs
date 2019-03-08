@@ -11,18 +11,18 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
     {
         protected override Expression VisitExtension(Expression extensionExpression)
         {
-            if (extensionExpression is NavigationBindingExpression navigationBindingExpression2)
+            if (extensionExpression is NavigationBindingExpression navigationBindingExpression)
             {
-                var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression2.RootParameter);
+                var newRootParameter = (ParameterExpression)Visit(navigationBindingExpression.RootParameter);
 
-                return newRootParameter != navigationBindingExpression2.RootParameter
+                return newRootParameter != navigationBindingExpression.RootParameter
                     ? new NavigationBindingExpression(
                         newRootParameter,
-                        navigationBindingExpression2.NavigationTreeNode,
-                        navigationBindingExpression2.EntityType,
-                        navigationBindingExpression2.SourceMapping,
-                        navigationBindingExpression2.Type)
-                    : navigationBindingExpression2;
+                        navigationBindingExpression.NavigationTreeNode,
+                        navigationBindingExpression.EntityType,
+                        navigationBindingExpression.SourceMapping,
+                        navigationBindingExpression.Type)
+                    : navigationBindingExpression;
             }
 
             if (extensionExpression is CustomRootExpression customRootExpression)

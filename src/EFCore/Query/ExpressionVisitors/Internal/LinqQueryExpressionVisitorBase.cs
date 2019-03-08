@@ -29,7 +29,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
         protected MethodInfo QueryableFirstOrDefaultPredicateMethodInfo { get; set; }
         protected MethodInfo QueryableSinglePredicateMethodInfo { get; set; }
         protected MethodInfo QueryableSingleOrDefaultPredicateMethodInfo { get; set; }
-
+        
         protected MethodInfo QueryableAny { get; set; }
         protected MethodInfo QueryableAnyPredicate { get; set; }
         protected MethodInfo QueryableContains { get; set; }

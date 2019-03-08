@@ -240,6 +240,20 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     : result;
             }
 
+            if (extensionExpression is CustomRootExpression2 customRootExpression2)
+            {
+                var result = customRootExpression2.Unwrap();
+
+                return new NavigationExpansionReducingVisitor().Visit(result);
+            }
+
+            if (extensionExpression is NavigationExpansionExpression navigationExpansionExpression)
+            {
+                var result = new NavigationExpansionReducingVisitor().Visit(navigationExpansionExpression);
+
+                return result;
+            }
+
             return base.VisitExtension(extensionExpression);
         }
     }
