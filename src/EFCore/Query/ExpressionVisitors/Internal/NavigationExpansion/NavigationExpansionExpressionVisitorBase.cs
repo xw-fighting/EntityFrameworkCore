@@ -66,7 +66,17 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                     : nullSafeEqualExpression;
             }
 
-            return base.VisitExtension(extensionExpression);
+            if (extensionExpression is NullConditionalExpression nullConditionalExpression)
+            {
+                var newCaller = Visit(nullConditionalExpression.Caller);
+                var newAccessOperation = Visit(nullConditionalExpression.AccessOperation);
+
+                return newCaller != nullConditionalExpression.Caller || newAccessOperation != nullConditionalExpression.AccessOperation
+                    ? new NullConditionalExpression(newCaller, newAccessOperation)
+                    : nullConditionalExpression;
+            }
+
+            throw new System.InvalidOperationException("Unhandled operator: " + extensionExpression);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Extensions.Internal;
 
@@ -10,14 +11,25 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
     {
         protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
         {
-            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
+            if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyMethodInfo)
+                || methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
             {
                 var outer = Visit(methodCallExpression.Arguments[0]);
                 var collectionSelector = Visit(methodCallExpression.Arguments[1]);
                 var collectionSelectorLambda = collectionSelector.UnwrapQuote();
 
-                var resultSelector = Visit(methodCallExpression.Arguments[2]);
-                var resultSelectorLambda = resultSelector.UnwrapQuote();
+                var resultSelectorLambda = default(LambdaExpression);
+                if (methodCallExpression.Method.MethodIsClosedFormOf(QueryableSelectManyWithResultOperatorMethodInfo))
+                {
+                    var resultSelector = Visit(methodCallExpression.Arguments[2]);
+                    resultSelectorLambda = resultSelector.UnwrapQuote();
+                }
+                else
+                {
+                    var collectionElementParameter1 = Expression.Parameter(methodCallExpression.Method.GetGenericArguments()[0], "o");
+                    var collectionElementParameter2 = Expression.Parameter(methodCallExpression.Method.GetGenericArguments()[1], "i");
+                    resultSelectorLambda = Expression.Lambda(collectionElementParameter2, collectionElementParameter1, collectionElementParameter2);
+                }
 
                 var correlationChecker = new CorrelationChecker(collectionSelectorLambda.Parameters[0]);
                 correlationChecker.Visit(collectionSelectorLambda.Body);
@@ -35,20 +47,18 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                         var innerElementType = methodCallExpression.Method.GetGenericArguments()[1];
 
                         var joinMethodInfo = QueryableJoinMethodInfo.MakeGenericMethod(
-                            outerElementType,
-                            innerElementType,
-                            outerKeyLambdaBody.Type,
-                            resultSelectorLambda.Body.Type);
+                        outerElementType,
+                        innerElementType,
+                        outerKeyLambdaBody.Type,
+                        resultSelectorLambda.Body.Type);
 
-                        var rewritten = Expression.Call(
+                        return Expression.Call(
                             joinMethodInfo,
                             outer,
                             collectionSelectorWithoutCorelationPredicate,
                             outerKeyLambda,
                             innerKeyLambda,
                             resultSelectorLambda);
-
-                        return rewritten;
                     }
                 }
             }
@@ -59,8 +69,13 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
         private class CorrelationChecker : NavigationExpansionExpressionVisitorBase
         {
             private ParameterExpression _rootParameter;
+            private bool _correlated = false;
+            private bool _defaultIfEmptyFound = false;
 
-            public bool Correlated { get; private set; } = false;
+            public bool Correlated
+            {
+                get { return _correlated && !_defaultIfEmptyFound; }
+            }
 
             public CorrelationChecker(ParameterExpression rootParameter)
             {
@@ -71,10 +86,24 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
             {
                 if (parameterExpression == _rootParameter)
                 {
-                    Correlated = true;
+                    _correlated = true;
                 }
 
                 return parameterExpression;
+            }
+
+            protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
+            {
+                // TODO: perhaps be can be smarter here - if DefaultIfEmpty is only present in the deeper part of the query it might be OK to perform the optimization
+                // as long as it doesn't affect the correlated collection directly
+                if (methodCallExpression.Method.Name == nameof(Queryable.DefaultIfEmpty))
+                {
+                    _defaultIfEmptyFound = true;
+
+                    return methodCallExpression;
+                }
+
+                return base.VisitMethodCall(methodCallExpression);
             }
         }
     }

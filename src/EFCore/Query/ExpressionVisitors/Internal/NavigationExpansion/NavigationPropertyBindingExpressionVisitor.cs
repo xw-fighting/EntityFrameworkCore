@@ -73,7 +73,8 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
 
         protected override Expression VisitUnary(UnaryExpression unaryExpression)
         {
-            if (unaryExpression.NodeType == ExpressionType.Convert)
+            if (unaryExpression.NodeType == ExpressionType.Convert
+                && unaryExpression.Type != typeof(object))
             {
                 var newOperand = Visit(unaryExpression.Operand);
                 if (newOperand is NavigationBindingExpression navigationBindingExpression)

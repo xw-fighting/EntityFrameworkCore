@@ -775,34 +775,28 @@ WHERE [o].[OrderID] < 10300");
         {
             await base.Project_single_element_from_collection_with_OrderBy_over_navigation_Take_and_FirstOrDefault_2(isAsync);
 
-            AssertSql(
+            AssertContainsSql(
                 @"SELECT [o].[OrderID]
 FROM [Orders] AS [o]
 WHERE [o].[OrderID] < 10250",
                 //
                 @"@_outer_OrderID='10248'
 
-SELECT TOP(1) [t].*
-FROM (
-    SELECT TOP(1) [od].[OrderID], [od].[ProductID], [od].[Discount], [od].[Quantity], [od].[UnitPrice], [od.Product].[ProductName]
-    FROM [Order Details] AS [od]
-    INNER JOIN [Products] AS [od.Product] ON [od].[ProductID] = [od.Product].[ProductID]
-    WHERE @_outer_OrderID = [od].[OrderID]
-    ORDER BY [od.Product].[ProductName]
-) AS [t]
-ORDER BY [t].[ProductName]",
+SELECT [od].[OrderID], [od].[ProductID], [od].[Discount], [od].[Quantity], [od].[UnitPrice]
+FROM [Order Details] AS [od]
+WHERE @_outer_OrderID = [od].[OrderID]",
+                //
+                @"SELECT [od.Product].[ProductID], [od.Product].[ProductName]
+FROM [Products] AS [od.Product]",
                 //
                 @"@_outer_OrderID='10249'
 
-SELECT TOP(1) [t].*
-FROM (
-    SELECT TOP(1) [od].[OrderID], [od].[ProductID], [od].[Discount], [od].[Quantity], [od].[UnitPrice], [od.Product].[ProductName]
-    FROM [Order Details] AS [od]
-    INNER JOIN [Products] AS [od.Product] ON [od].[ProductID] = [od.Product].[ProductID]
-    WHERE @_outer_OrderID = [od].[OrderID]
-    ORDER BY [od.Product].[ProductName]
-) AS [t]
-ORDER BY [t].[ProductName]");
+SELECT [od].[OrderID], [od].[ProductID], [od].[Discount], [od].[Quantity], [od].[UnitPrice]
+FROM [Order Details] AS [od]
+WHERE @_outer_OrderID = [od].[OrderID]",
+                //
+                @"SELECT [od.Product].[ProductID], [od.Product].[ProductName]
+FROM [Products] AS [od.Product]");
         }
 
         public override async Task Select_datetime_year_component(bool isAsync)

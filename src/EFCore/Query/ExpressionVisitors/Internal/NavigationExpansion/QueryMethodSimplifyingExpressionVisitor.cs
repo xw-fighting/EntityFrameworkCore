@@ -33,7 +33,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal.Naviga
                 ? QueryableWhereMethodInfo
                 : EnumerableWhereMethodInfo;
 
-            var typeArgument = newSource.Type.GetGenericArguments()[0];
+            var typeArgument = newSource.Type.TryGetSequenceType();//.GetGenericArguments()[0];
             whereMethodInfo = whereMethodInfo.MakeGenericMethod(typeArgument);
 
             var whereMethodCall = Expression.Call(whereMethodInfo, newSource, methodCallExpression.Arguments[1]);

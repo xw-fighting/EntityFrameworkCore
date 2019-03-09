@@ -72,7 +72,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     ((LambdaExpression)methodCallExpression.Arguments[0]).Parameters[0]);
 
                 var result = Expression.Call(
-                    EnumerableAnyPredicate.MakeGenericMethod(methodCallExpression.Method.DeclaringType.GetGenericArguments()[0]),
+                    EnumerableAnyPredicate.MakeGenericMethod(methodCallExpression.Method.DeclaringType.TryGetSequenceType()/*.GetGenericArguments()[0]*/),
                     methodCallExpression.Object,
                     anyLambda);
 
@@ -95,14 +95,14 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                     var collectionNavigationElementType = lastNavigation.ForeignKey.DeclaringEntityType.ClrType;
                     var entityQueryable = NullAsyncQueryProvider.Instance.CreateEntityQueryableExpression(collectionNavigationElementType);
 
-                    var caller = navigationBindingExpression.NavigationTreeNode.Parent.BuildExpression(navigationBindingExpression.RootParameter);
                     navigationBindingExpression.NavigationTreeNode.Parent.Children.Remove(navigationBindingExpression.NavigationTreeNode);
 
                     //TODO: this could be other things too: EF.Property and maybe field
                     var outerBinding = new NavigationBindingExpression(
                     navigationBindingExpression.RootParameter,
                     navigationBindingExpression.NavigationTreeNode.Parent,
-                    navigationBindingExpression.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression.SourceMapping.RootEntityType,
+                    //navigationBindingExpression.NavigationTreeNode.Navigation.GetTargetType() ?? navigationBindingExpression.SourceMapping.RootEntityType,
+                    lastNavigation.DeclaringEntityType,
                     navigationBindingExpression.SourceMapping,
                     lastNavigation.DeclaringEntityType.ClrType);
 
@@ -125,7 +125,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                             navigationBindingExpression.NavigationTreeNode.NavigationChain()),
                         innerParameter);
 
-                    predicate = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(navigationBindingExpression.RootParameter).Visit(predicate);
+                    //predicate = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(navigationBindingExpression.RootParameter).Visit(predicate);
 
                     var result = Expression.Call(
                         QueryableWhereMethodInfo.MakeGenericMethod(collectionNavigationElementType),
@@ -178,7 +178,7 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal
                 if (memberExpression.Member.Name == nameof(List<int>.Count))
                 {
                     // TODO: what about custom collection?????????? - how do we get type argument there
-                    var countMethod = QueryableCountMethodInfo.MakeGenericMethod(newExpression.Type.GetGenericArguments()[0]);
+                    var countMethod = QueryableCountMethodInfo.MakeGenericMethod(newExpression.Type.TryGetSequenceType()/*.GetGenericArguments()[0]*/);
                     var result = Expression.Call(instance: null, countMethod, newExpression);
 
                     return result;

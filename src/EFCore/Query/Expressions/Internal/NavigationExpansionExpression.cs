@@ -60,17 +60,21 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions.Internal
             }
 
             var result = Operand;
-            var parameter = Parameter(result.Type.GetGenericArguments()[0]);
+            var parameter = Parameter(result.Type.TryGetSequenceType());
             if (State.ApplyPendingSelector)
             {
                 var pendingSelector = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(State.CurrentParameter).Visit(State.PendingSelector);
 
+                // we can't get body type using lambda.Body.Type because in some cases (SelectMany) we manually set the lambda type (IEnumerable<Entity>) where the body itself is IQueryable
+                // TODO: this might be problem in other places!
+                var pendingSelectorBodyType = pendingSelector.Type.GetGenericArguments()[1];
+
                 var pendingSelectMathod = result.Type.IsGenericType && (result.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>) || result.Type.GetGenericTypeDefinition() == typeof(IOrderedEnumerable<>))
-                    ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type)
-                    : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelector.Body.Type);
+                    ? _enumerableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelectorBodyType)
+                    : _queryableSelectMethodInfo.MakeGenericMethod(parameter.Type, pendingSelectorBodyType);
 
                 result = Call(pendingSelectMathod, result, pendingSelector);
-                parameter = Parameter(result.Type.GetGenericArguments()[0]);
+                parameter = Parameter(result.Type.TryGetSequenceType());
             }
 
             if (State.PendingTerminatingOperator != null)
