@@ -12,7 +12,10 @@ using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query.ExpressionVisitors.Internal;
+using Microsoft.EntityFrameworkCore.Query.NavigationExpansion;
+using Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,6 +54,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
 
         private readonly Type _contextType;
         private readonly IEvaluatableExpressionFilter _evaluatableExpressionFilter;
+        private readonly IModel _model;
 
         /// <summary>
         ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
@@ -64,7 +68,8 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             [NotNull] IDiagnosticsLogger<DbLoggerCategory.Query> logger,
             [NotNull] ICurrentDbContext currentContext,
             [NotNull] IQueryModelGenerator queryModelGenerator,
-            [NotNull] IEvaluatableExpressionFilter evaluatableExpressionFilter)
+            [NotNull] IEvaluatableExpressionFilter evaluatableExpressionFilter,
+            [NotNull] IModel model)
         {
             Check.NotNull(queryContextFactory, nameof(queryContextFactory));
             Check.NotNull(compiledQueryCache, nameof(compiledQueryCache));
@@ -73,6 +78,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             Check.NotNull(logger, nameof(logger));
             Check.NotNull(currentContext, nameof(currentContext));
             Check.NotNull(evaluatableExpressionFilter, nameof(evaluatableExpressionFilter));
+            Check.NotNull(model, nameof(model));
 
             _queryContextFactory = queryContextFactory;
             _compiledQueryCache = compiledQueryCache;
@@ -82,6 +88,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             _contextType = currentContext.Context.GetType();
             _queryModelGenerator = queryModelGenerator;
             _evaluatableExpressionFilter = evaluatableExpressionFilter;
+            _model = model;
         }
 
         /// <summary>
@@ -101,6 +108,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             var queryContext = _queryContextFactory.Create();
 
             query = ExtractParameters(query, queryContext, _logger);
+            query = ExpandNavigations(query);
 
             var compiledQuery
                 = _compiledQueryCache
@@ -109,6 +117,14 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                         () => CompileQueryCore<TResult>(query, _queryModelGenerator, _database, _logger, _contextType));
 
             return compiledQuery(queryContext);
+        }
+
+        private Expression ExpandNavigations(Expression query)
+        {
+            var navigationExpander = new NavigationExpander(_model);
+            var newQuery = navigationExpander.ExpandNavigations(query);
+
+            return newQuery;
         }
 
         /// <summary>
@@ -132,6 +148,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             Type contextType)
         {
             var queryModel = queryModelGenerator.ParseQuery(query);
+
+            // this is temporary, until relinq is removed
+            var tirev = new TransparentIdentifierRemovingVisitor();
+            queryModel.TransformExpressions(tirev.Visit);
+
+            var atasev = new AnonymousObjectAccessSimplifyingVisitor();
+            queryModel.TransformExpressions(atasev.Visit);
 
             var resultItemType
                 = (queryModel.GetOutputDataInfo()
@@ -184,6 +207,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             var queryContext = _queryContextFactory.Create();
 
             query = ExtractParameters(query, queryContext, _logger);
+            query = ExpandNavigations(query);
 
             var compiledQuery
                 = _compiledQueryCache
@@ -220,6 +244,7 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             queryContext.CancellationToken = cancellationToken;
 
             query = ExtractParameters(query, queryContext, _logger);
+            query = ExpandNavigations(query);
 
             var compiledQuery
                 = _compiledQueryCache
@@ -276,6 +301,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
             IDatabase database)
         {
             var queryModel = queryModelGenerator.ParseQuery(query);
+
+            // this is temporary, until relinq is removed
+            var tirev = new TransparentIdentifierRemovingVisitor();
+            queryModel.TransformExpressions(tirev.Visit);
+
+            var atasev = new AnonymousObjectAccessSimplifyingVisitor();
+            queryModel.TransformExpressions(atasev.Visit);
 
             var resultItemType
                 = (queryModel.GetOutputDataInfo()

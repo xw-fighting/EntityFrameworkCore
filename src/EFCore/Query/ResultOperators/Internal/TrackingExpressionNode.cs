@@ -13,6 +13,52 @@ namespace Microsoft.EntityFrameworkCore.Query.ResultOperators.Internal
     ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
     ///     directly from your code. This API may change or be removed in future releases.
     /// </summary>
+    public class ToOrderedExpressionNode : ResultOperatorExpressionNodeBase
+    {
+        private static readonly MethodInfo _toOrderedMethodInfo
+            = typeof(NavigationExpansion.NavigationExpansionExpression)
+                .GetTypeInfo().GetDeclaredMethod(nameof(NavigationExpansion.NavigationExpansionExpression.ToOrdered));
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public static readonly IReadOnlyCollection<MethodInfo> SupportedMethods = new[]
+        {
+            _toOrderedMethodInfo
+        };
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public ToOrderedExpressionNode(MethodCallExpressionParseInfo parseInfo)
+            : base(parseInfo, null, null)
+        {
+        }
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        protected override ResultOperatorBase CreateResultOperator(ClauseGenerationContext clauseGenerationContext)
+            => new ToOrderedResultOperator();
+
+        /// <summary>
+        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+        ///     directly from your code. This API may change or be removed in future releases.
+        /// </summary>
+        public override Expression Resolve(
+            ParameterExpression inputParameter,
+            Expression expressionToBeResolved,
+            ClauseGenerationContext clauseGenerationContext)
+            => Source.Resolve(inputParameter, expressionToBeResolved, clauseGenerationContext);
+    }
+
+    /// <summary>
+    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
+    ///     directly from your code. This API may change or be removed in future releases.
+    /// </summary>
     public class TrackingExpressionNode : ResultOperatorExpressionNodeBase
     {
         /// <summary>

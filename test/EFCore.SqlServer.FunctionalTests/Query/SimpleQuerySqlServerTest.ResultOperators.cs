@@ -678,7 +678,7 @@ FROM [Customers] AS [c]
 WHERE ([c].[CustomerID] = N'ALFKI') AND ((
     SELECT TOP(1) [o].[CustomerID]
     FROM [Orders] AS [o]
-    WHERE ([o].[CustomerID] = N'ALFKI') AND ([c].[CustomerID] = [o].[CustomerID])
+    WHERE ([c].[CustomerID] = [o].[CustomerID]) AND ([o].[CustomerID] = N'ALFKI')
 ) = N'ALFKI')");
         }
 

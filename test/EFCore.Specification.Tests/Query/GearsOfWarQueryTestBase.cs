@@ -7271,6 +7271,86 @@ namespace Microsoft.EntityFrameworkCore.Query
                       select t);
         }
 
+        [ConditionalFact]
+        public virtual void OfTypeNav1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").OfType<Officer>().Where(o => o.Tag.Note != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void OfTypeNav2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").OfType<Officer>().Where(o => o.AssignedCity.Location != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void OfTypeNav3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Gears.Where(g => g.Tag.Note != "Foo").Join(ctx.Weapons, g => g.FullName, w => w.OwnerFullName, (o, i) => o).OfType<Officer>().Where(o => o.Tag.Note != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_Distinct_with_convert()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => (LocustHorde)f).Distinct().Where(lh => lh.Commander.Name != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_Distinct_with_convert_anonymous()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => new { horde = (LocustHorde)f }).Distinct().Where(lh => lh.horde.Commander.Name != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_with_convert1()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => ((LocustHorde)f).Commander);
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_with_convert2()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => (LocustHorde)f).Where(lh => lh.Commander.Name != "Bar");
+                var result = query.ToList();
+            }
+        }
+
+        [ConditionalFact]
+        public virtual void Nav_rewrite_with_convert3()
+        {
+            using (var ctx = CreateContext())
+            {
+                var query = ctx.Factions.Where(f => f.Capital.Name != "Foo").Select(f => new { horde = (LocustHorde)f }).Where(x => x.horde.Commander.Name != "Bar");
+                var result = query.ToList();
+            }
+        }
+
         protected GearsOfWarContext CreateContext() => Fixture.CreateContext();
 
         protected virtual void ClearLog()
