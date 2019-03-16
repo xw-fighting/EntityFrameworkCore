@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore.Query.Expressions;
 using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.EntityFrameworkCore.Query.NavigationExpansion;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Remotion.Linq;
@@ -1145,8 +1146,16 @@ namespace Microsoft.EntityFrameworkCore.Query.ExpressionVisitors
                     return new NullableExpression(newAccessOperation);
 
                 case NullSafeEqualExpression nullSafeEqualExpression:
+                    throw new InvalidOperationException("NullSafeEqualExpression shouldn't be here");
+                //case NullSafeEqualExpression nullSafeEqualExpression:
+                //    var equalityExpression
+                //        = new NullCompensatedExpression(nullSafeEqualExpression.EqualExpression);
+
+                //    return Visit(equalityExpression);
+
+                case CorrelationPredicateExpression correlationPredicateExpression:
                     var equalityExpression
-                        = new NullCompensatedExpression(nullSafeEqualExpression.EqualExpression);
+                        = new NullCompensatedExpression(correlationPredicateExpression.EqualExpression);
 
                     return Visit(equalityExpression);
 

@@ -9,7 +9,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Extensions.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Query.Expressions.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
@@ -60,24 +59,42 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                     : methodCallExpression;
             }
 
-            // List<T>.Exists(predicate) -> Enumerable.Any<T>(source, predicate)
+            // collection.Exists(predicate) -> Enumerable.Any(collection, predicate)
             if (methodCallExpression.Method.Name == nameof(List<int>.Exists)
                 && methodCallExpression.Method.DeclaringType.IsGenericType
                 && methodCallExpression.Method.DeclaringType.GetGenericTypeDefinition() == typeof(List<>))
             {
-                var anyLambda = Expression.Lambda(
-                    ((LambdaExpression)methodCallExpression.Arguments[0]).Body,
-                    ((LambdaExpression)methodCallExpression.Arguments[0]).Parameters[0]);
+                var newCaller = Visit(methodCallExpression.Object);
+                var newPredicate = Visit(methodCallExpression.Arguments[0]);
 
-                var result = Expression.Call(
-                    EnumerableAnyPredicate.MakeGenericMethod(methodCallExpression.Method.DeclaringType.GetSequenceType()),
-                    methodCallExpression.Object,
-                    anyLambda);
-
-                return Visit(result);
+                return Expression.Call(
+                    EnumerableAnyPredicateMethodInfo.MakeGenericMethod(newCaller.Type.GetSequenceType()),
+                    newCaller,
+                    Expression.Lambda(
+                        ((LambdaExpression)newPredicate).Body,
+                        ((LambdaExpression)newPredicate).Parameters[0]));
             }
 
-            // TODO: collection.Contains?
+            // collection.Contains(element) -> Enumerable.Any(collection, c => c == element)
+            if (methodCallExpression.Method.Name == nameof(List<int>.Contains)
+                && methodCallExpression.Arguments.Count == 1
+                && methodCallExpression.Object is NavigationBindingExpression navigationBindingCaller
+                && navigationBindingCaller.NavigationTreeNode.Navigation != null
+                && navigationBindingCaller.NavigationTreeNode.Navigation.IsCollection())
+            {
+                var newCaller = Visit(methodCallExpression.Object);
+                var newArgument = Visit(methodCallExpression.Arguments[0]);
+
+                var lambdaParameter = Expression.Parameter(newCaller.Type.GetSequenceType(), newCaller.Type.GetSequenceType().GenerateParameterName());
+                var lambda = Expression.Lambda(
+                    Expression.Equal(lambdaParameter, newArgument),
+                    lambdaParameter);
+
+                return Expression.Call(
+                    EnumerableAnyPredicateMethodInfo.MakeGenericMethod(newCaller.Type.GetSequenceType()),
+                    newCaller,
+                    lambda);
+            }
 
             return base.VisitMethodCall(methodCallExpression);
         }
@@ -104,12 +121,12 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                     navigationBindingExpression.SourceMapping,
                     lastNavigation.DeclaringEntityType.ClrType);
 
-                    var outerKeyAccess = CreateKeyAccessExpression(
+                    var outerKeyAccess = NavigationExpansionHelpers.CreateKeyAccessExpression(
                         outerBinding,
                         lastNavigation.ForeignKey.PrincipalKey.Properties);
 
                     var innerParameter = Expression.Parameter(collectionNavigationElementType, collectionNavigationElementType.GenerateParameterName());
-                    var innerKeyAccess = CreateKeyAccessExpression(
+                    var innerKeyAccess = NavigationExpansionHelpers.CreateKeyAccessExpression(
                         innerParameter,
                         lastNavigation.ForeignKey.Properties);
 
@@ -117,10 +134,10 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                         CreateKeyComparisonExpressionForCollectionNavigationSubquery(
                             outerKeyAccess,
                             innerKeyAccess,
-                            outerBinding,
+                            outerBinding/*,
                             navigationBindingExpression.RootParameter,
                             // TODO: this is hacky
-                            navigationBindingExpression.NavigationTreeNode.NavigationChain()),
+                            navigationBindingExpression.NavigationTreeNode.NavigationChain()*/),
                         innerParameter);
 
                     //predicate = (LambdaExpression)new NavigationPropertyUnbindingBindingExpressionVisitor(navigationBindingExpression.RootParameter).Visit(predicate);
@@ -131,6 +148,20 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                         predicate);
 
                     return result;
+                }
+            }
+
+            if (extensionExpression is CorrelationPredicateExpression correlationPredicateExpression)
+            {
+                var newOuterKeyNullCheck = Visit(correlationPredicateExpression.OuterKeyNullCheck);
+                var newEqualExpression = (BinaryExpression)Visit(correlationPredicateExpression.EqualExpression);
+                //var newNavigationRootExpression = Visit(nullSafeEqualExpression.NavigationRootExpression);
+
+                if (newOuterKeyNullCheck != correlationPredicateExpression.OuterKeyNullCheck
+                    || newEqualExpression != correlationPredicateExpression.EqualExpression
+                    /*|| newNavigationRootExpression != nullSafeEqualExpression.NavigationRootExpression*/)
+                {
+                    return new CorrelationPredicateExpression(newOuterKeyNullCheck, newEqualExpression/*, newNavigationRootExpression, nullSafeEqualExpression.Navigations*/);
                 }
             }
 
@@ -181,49 +212,12 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
             return memberExpression;
         }
 
-        private static Expression CreateKeyAccessExpression(
-            Expression target, IReadOnlyList<IProperty> properties, bool addNullCheck = false)
-            => properties.Count == 1
-                ? CreatePropertyExpression(target, properties[0], addNullCheck)
-                : Expression.New(
-                    AnonymousObject.AnonymousObjectCtor,
-                    Expression.NewArrayInit(
-                        typeof(object),
-                        properties
-                            .Select(p => Expression.Convert(CreatePropertyExpression(target, p, addNullCheck), typeof(object)))
-                            .Cast<Expression>()
-                            .ToArray()));
-
-        private static Expression CreatePropertyExpression(Expression target, IProperty property, bool addNullCheck)
-        {
-            var propertyExpression = target.CreateEFPropertyExpression(property, makeNullable: false);
-
-            var propertyDeclaringType = property.DeclaringType.ClrType;
-            if (propertyDeclaringType != target.Type
-                && target.Type.GetTypeInfo().IsAssignableFrom(propertyDeclaringType.GetTypeInfo()))
-            {
-                if (!propertyExpression.Type.IsNullableType())
-                {
-                    propertyExpression = Expression.Convert(propertyExpression, propertyExpression.Type.MakeNullable());
-                }
-
-                return Expression.Condition(
-                    Expression.TypeIs(target, propertyDeclaringType),
-                    propertyExpression,
-                    Expression.Constant(null, propertyExpression.Type));
-            }
-
-            return addNullCheck
-                ? new NullConditionalExpression(target, propertyExpression)
-                : propertyExpression;
-        }
-
         private static Expression CreateKeyComparisonExpressionForCollectionNavigationSubquery(
             Expression outerKeyExpression,
             Expression innerKeyExpression,
-            Expression colectionRootExpression,
+            Expression colectionRootExpression/*,
             Expression navigationRootExpression,
-            IEnumerable<INavigation> navigations)
+            IEnumerable<INavigation> navigations*/)
         {
             if (outerKeyExpression.Type != innerKeyExpression.Type)
             {
@@ -247,7 +241,10 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                     colectionRootExpression,
                     Expression.Constant(null, colectionRootExpression.Type));
 
-            return Expression.Equal(outerKeyExpression, innerKeyExpression);
+            return new CorrelationPredicateExpression(
+                outerNullProtection,
+                Expression.Equal(outerKeyExpression, innerKeyExpression));
+
             //return new NullSafeEqualExpression(
             //    outerNullProtection,
             //    Expression.Equal(outerKeyExpression, innerKeyExpression),

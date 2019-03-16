@@ -53,6 +53,17 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
                         navigationExpansionExpression.Type)
                     : navigationExpansionExpression;
             }
+            
+            if (extensionExpression is CorrelationPredicateExpression correlationPredicateExpression)
+            {
+                var newOuterKeyNullCheck = Visit(correlationPredicateExpression.OuterKeyNullCheck);
+                var newEqualExpression = (BinaryExpression)Visit(correlationPredicateExpression.EqualExpression);
+                //var newNavigationRootExpression = Visit(nullSafeEqualExpression.NavigationRootExpression);
+
+                return newOuterKeyNullCheck != correlationPredicateExpression.OuterKeyNullCheck || newEqualExpression != correlationPredicateExpression.EqualExpression// || newNavigationRootExpression != nullSafeEqualExpression.NavigationRootExpression
+                    ? new CorrelationPredicateExpression(newOuterKeyNullCheck, newEqualExpression/*, nullSafeEqualExpression.NavigationRootExpression, nullSafeEqualExpression.Navigations*/)
+                    : correlationPredicateExpression;
+            }
 
             //if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
             //{

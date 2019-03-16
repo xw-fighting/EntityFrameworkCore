@@ -737,6 +737,11 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 appendAction("{ ");
             }
 
+            if (isComplex)
+            {
+                _stringBuilder.IncrementIndent();
+            }
+
             for (var i = 0; i < newExpression.Arguments.Count; i++)
             {
                 if (newExpression.Members != null)
@@ -747,13 +752,6 @@ namespace Microsoft.EntityFrameworkCore.Query.Internal
                 Visit(newExpression.Arguments[i]);
                 appendAction(i == newExpression.Arguments.Count - 1 ? "" : ", ");
             }
-
-            if (isComplex)
-            {
-                _stringBuilder.IncrementIndent();
-            }
-
-            VisitArguments(newExpression.Arguments, appendAction);
 
             if (isComplex)
             {

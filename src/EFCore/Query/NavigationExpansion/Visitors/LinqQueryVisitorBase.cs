@@ -30,9 +30,9 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
         protected MethodInfo QueryableSinglePredicateMethodInfo { get; set; }
         protected MethodInfo QueryableSingleOrDefaultPredicateMethodInfo { get; set; }
 
-        protected MethodInfo QueryableAny { get; set; }
-        protected MethodInfo QueryableAnyPredicate { get; set; }
-        protected MethodInfo QueryableContains { get; set; }
+        protected MethodInfo QueryableAnyMethodInfo { get; set; }
+        protected MethodInfo QueryableAnyPredicateMethodInfo { get; set; }
+        protected MethodInfo QueryableContainsMethodInfo { get; set; }
 
         protected MethodInfo QueryableCountMethodInfo { get; set; }
         protected MethodInfo QueryableCountPredicateMethodInfo { get; set; }
@@ -48,8 +48,14 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
         protected MethodInfo EnumerableWhereMethodInfo { get; set; }
         protected MethodInfo EnumerableSelectMethodInfo { get; set; }
 
+        protected MethodInfo EnumerableJoinMethodInfo { get; set; }
         protected MethodInfo EnumerableGroupJoinMethodInfo { get; set; }
         protected MethodInfo EnumerableSelectManyWithResultOperatorMethodInfo { get; set; }
+
+        protected MethodInfo EnumerableFirstMethodInfo { get; set; }
+        protected MethodInfo EnumerableFirstOrDefaultMethodInfo { get; set; }
+        protected MethodInfo EnumerableSingleMethodInfo { get; set; }
+        protected MethodInfo EnumerableSingleOrDefaultMethodInfo { get; set; }
 
         protected MethodInfo EnumerableFirstPredicateMethodInfo { get; set; }
         protected MethodInfo EnumerableFirstOrDefaultPredicateMethodInfo { get; set; }
@@ -58,8 +64,13 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
 
         protected MethodInfo EnumerableDefaultIfEmptyMethodInfo { get; set; }
 
-        protected MethodInfo EnumerableAny { get; set; }
-        protected MethodInfo EnumerableAnyPredicate { get; set; }
+        protected MethodInfo EnumerableAnyMethodInfo { get; set; }
+        protected MethodInfo EnumerableAnyPredicateMethodInfo { get; set; }
+        protected MethodInfo EnumerableContainsMethodInfo { get; set; }
+
+        protected MethodInfo EnumerableCountMethodInfo { get; set; }
+        protected MethodInfo EnumerableCountPredicateMethodInfo { get; set; }
+
 
         protected LinqQueryVisitorBase()
         {
@@ -94,9 +105,9 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
             QueryableTakeMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Take) && m.GetParameters().Count() == 2).Single();
             QueryableSkipMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Skip) && m.GetParameters().Count() == 2).Single();
 
-            QueryableAny = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 1).Single();
-            QueryableAnyPredicate = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 2).Single();
-            QueryableContains = queryableMethods.Where(m => m.Name == nameof(Queryable.Contains) && m.GetParameters().Count() == 2).Single();
+            QueryableAnyMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 1).Single();
+            QueryableAnyPredicateMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Any) && m.GetParameters().Count() == 2).Single();
+            QueryableContainsMethodInfo = queryableMethods.Where(m => m.Name == nameof(Queryable.Contains) && m.GetParameters().Count() == 2).Single();
 
             QueryableOfType = queryableMethods.Where(m => m.Name == nameof(Queryable.OfType) && m.GetParameters().Count() == 1).Single();
 
@@ -108,8 +119,14 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
             EnumerableWhereMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Where) && m.GetParameters()[1].ParameterType.GetGenericArguments().Count() == 2).Single();
             EnumerableSelectMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Select) && m.GetParameters()[1].ParameterType.GetGenericArguments().Count() == 2).Single();
 
+            EnumerableJoinMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Join) && m.GetParameters().Count() == 5).Single();
             EnumerableGroupJoinMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.GroupJoin) && m.GetParameters().Count() == 5).Single();
             EnumerableSelectManyWithResultOperatorMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.SelectMany) && m.GetParameters().Count() == 3 && m.GetParameters()[1].ParameterType.GetGenericArguments().Count() == 2).Single();
+
+            EnumerableFirstMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.First) && m.GetParameters().Count() == 1).Single();
+            EnumerableFirstOrDefaultMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.FirstOrDefault) && m.GetParameters().Count() == 1).Single();
+            EnumerableSingleMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Single) && m.GetParameters().Count() == 1).Single();
+            EnumerableSingleOrDefaultMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.SingleOrDefault) && m.GetParameters().Count() == 1).Single();
 
             EnumerableFirstPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.First) && m.GetParameters().Count() == 2).Single();
             EnumerableFirstOrDefaultPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.FirstOrDefault) && m.GetParameters().Count() == 2).Single();
@@ -118,8 +135,12 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
 
             EnumerableDefaultIfEmptyMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.DefaultIfEmpty) && m.GetParameters().Count() == 1).Single();
 
-            EnumerableAny = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Count() == 1).Single();
-            EnumerableAnyPredicate = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Count() == 2).Single();
+            EnumerableAnyMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Count() == 1).Single();
+            EnumerableAnyPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Any) && m.GetParameters().Count() == 2).Single();
+            EnumerableContainsMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Contains) && m.GetParameters().Count() == 2).Single();
+
+            EnumerableCountMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Count) && m.GetParameters().Count() == 1).Single();
+            EnumerableCountPredicateMethodInfo = enumerableMethods.Where(m => m.Name == nameof(Enumerable.Count) && m.GetParameters().Count() == 2).Single();
         }
     }
 }

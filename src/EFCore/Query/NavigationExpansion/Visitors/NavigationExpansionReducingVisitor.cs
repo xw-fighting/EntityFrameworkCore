@@ -9,6 +9,17 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion.Visitors
     {
         protected override Expression VisitExtension(Expression extensionExpression)
         {
+            if (extensionExpression is CorrelationPredicateExpression correlationPredicateExpression)
+            {
+                var newOuterKeyNullCheck = Visit(correlationPredicateExpression.OuterKeyNullCheck);
+                var newEqualExpression = (BinaryExpression)Visit(correlationPredicateExpression.EqualExpression);
+                //var newNavigationRootExpression = Visit(nullSafeEqualExpression.NavigationRootExpression);
+
+                return newOuterKeyNullCheck != correlationPredicateExpression.OuterKeyNullCheck || newEqualExpression != correlationPredicateExpression.EqualExpression// || newNavigationRootExpression != nullSafeEqualExpression.NavigationRootExpression
+                    ? new CorrelationPredicateExpression(newOuterKeyNullCheck, newEqualExpression/*, nullSafeEqualExpression.NavigationRootExpression, nullSafeEqualExpression.Navigations*/)
+                    : correlationPredicateExpression;
+            }
+
             //if (extensionExpression is NullSafeEqualExpression nullSafeEqualExpression)
             //{
             //    var newOuterKeyNullCheck = Visit(nullSafeEqualExpression.OuterKeyNullCheck);

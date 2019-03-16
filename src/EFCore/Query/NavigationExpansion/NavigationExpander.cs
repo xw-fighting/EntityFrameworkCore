@@ -23,8 +23,7 @@ namespace Microsoft.EntityFrameworkCore.Query.NavigationExpansion
 
         public virtual Expression ExpandNavigations(Expression expression)
         {
-            var newExpression = new QueryMethodSimplifyingVisitor().Visit(expression);
-            newExpression = new NavigationExpandingVisitor(_model).Visit(newExpression);
+            var newExpression = new NavigationExpandingVisitor(_model).Visit(expression);
             newExpression = new NavigationExpansionReducingVisitor().Visit(newExpression);
 
             // TODO: hack to workaround type discrepancy that can happen sometimes when rerwriting collection navigations

@@ -8304,6 +8304,23 @@ LEFT JOIN (
 WHERE (([f].[Discriminator] = N'LocustHorde') AND (([f.Capital].[Name] <> N'Foo') OR [f.Capital].[Name] IS NULL)) AND (([t].[Name] <> N'Bar') OR [t].[Name] IS NULL)");
         }
 
+
+        public override async Task Where_contains_on_navigation_with_composite_keys(bool isAsync)
+        {
+            await base.Where_contains_on_navigation_with_composite_keys(isAsync);
+
+            AssertSql(
+                @"SELECT [g].[Nickname], [g].[SquadId], [g].[AssignedCityName], [g].[CityOrBirthName], [g].[Discriminator], [g].[FullName], [g].[HasSoulPatch], [g].[LeaderNickname], [g].[LeaderSquadId], [g].[Rank]
+FROM [Gears] AS [g]
+WHERE [g].[Discriminator] IN (N'Officer', N'Gear') AND EXISTS (
+    SELECT 1
+    FROM [Cities] AS [c]
+    WHERE EXISTS (
+        SELECT 1
+        FROM [Gears] AS [g0]
+        WHERE ([g0].[Discriminator] IN (N'Officer', N'Gear') AND ([c].[Name] = [g0].[CityOrBirthName])) AND (([g0].[Nickname] = [g].[Nickname]) AND ([g0].[SquadId] = [g].[SquadId]))))");
+        }
+
         private void AssertSql(params string[] expected)
             => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 

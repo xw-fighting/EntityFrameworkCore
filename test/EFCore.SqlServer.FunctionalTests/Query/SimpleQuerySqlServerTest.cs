@@ -3405,7 +3405,7 @@ CROSS APPLY (
     ) AS [t1] ON 1 = 1
 ) AS [t2]
 WHERE ([c].[City] = N'Seattle') AND ([t0].[OrderID] IS NOT NULL AND [t2].[OrderID] IS NOT NULL)
-ORDER BY [OrderID], [t2].[OrderDate]");
+ORDER BY [t0].[OrderID], [t2].[OrderDate]");
         }
 
         [SqlServerCondition(SqlServerCondition.SupportsOffset)]
@@ -4409,7 +4409,9 @@ ORDER BY [c].[CustomerID]");
                 @"SELECT [o1].[OrderID] AS [Id1], [o2].[OrderID] AS [Id2]
 FROM [Orders] AS [o1]
 CROSS JOIN [Orders] AS [o2]
-WHERE ([o1].[CustomerID] LIKE N'A' + N'%' AND (LEFT([o1].[CustomerID], LEN(N'A')) = N'A')) AND (([o1].[CustomerID] = [o2].[CustomerID]) OR ([o1].[CustomerID] IS NULL AND [o2].[CustomerID] IS NULL))
+LEFT JOIN [Customers] AS [ti.Customer] ON [o1].[CustomerID] = [ti.Customer].[CustomerID]
+LEFT JOIN [Customers] AS [ti.Customer.Customer] ON [o2].[CustomerID] = [ti.Customer.Customer].[CustomerID]
+WHERE ([o1].[CustomerID] LIKE N'A' + N'%' AND (LEFT([o1].[CustomerID], LEN(N'A')) = N'A')) AND ([ti.Customer].[CustomerID] = [ti.Customer.Customer].[CustomerID])
 ORDER BY [Id1], [Id2]");
         }
 
@@ -4421,7 +4423,9 @@ ORDER BY [Id1], [Id2]");
                 @"SELECT [o1].[OrderID] AS [Id1], [o2].[OrderID] AS [Id2]
 FROM [Orders] AS [o1]
 CROSS JOIN [Orders] AS [o2]
-WHERE ([o1].[CustomerID] LIKE N'A' + N'%' AND (LEFT([o1].[CustomerID], LEN(N'A')) = N'A')) AND (([o1].[CustomerID] = [o2].[CustomerID]) OR ([o1].[CustomerID] IS NULL AND [o2].[CustomerID] IS NULL))
+LEFT JOIN [Customers] AS [ti.Customer] ON [o1].[CustomerID] = [ti.Customer].[CustomerID]
+LEFT JOIN [Customers] AS [ti.Customer.Customer] ON [o2].[CustomerID] = [ti.Customer.Customer].[CustomerID]
+WHERE ([o1].[CustomerID] LIKE N'A' + N'%' AND (LEFT([o1].[CustomerID], LEN(N'A')) = N'A')) AND ([ti.Customer].[CustomerID] = [ti.Customer.Customer].[CustomerID])
 ORDER BY [Id1], [Id2]");
         }
 
@@ -4465,7 +4469,8 @@ WHERE [c].[CustomerID] IS NULL");
                 @"SELECT [od].[ProductID], [od].[OrderID]
 FROM [Order Details] AS [od]
 INNER JOIN [Orders] AS [od.Order] ON [od].[OrderID] = [od.Order].[OrderID]
-WHERE ([od].[OrderID] < 10250) AND [od.Order].[CustomerID] IS NOT NULL
+LEFT JOIN [Customers] AS [od.Order.Customer] ON [od.Order].[CustomerID] = [od.Order.Customer].[CustomerID]
+WHERE ([od].[OrderID] < 10250) AND [od.Order.Customer].[CustomerID] IS NOT NULL
 ORDER BY [od].[OrderID], [od].[ProductID]");
         }
 
@@ -4509,7 +4514,8 @@ WHERE (([c1].[CustomerID] = N'ALFKI') AND ([c2].[CustomerID] = N'ALFKI')) AND ([
                 @"SELECT [c].[CustomerID] AS [Id1], [o].[OrderID] AS [Id2]
 FROM [Customers] AS [c]
 CROSS JOIN [Orders] AS [o]
-WHERE ([c].[CustomerID] = N'ALFKI') AND ([c].[CustomerID] = [o].[CustomerID])
+LEFT JOIN [Customers] AS [ti.Customer] ON [o].[CustomerID] = [ti.Customer].[CustomerID]
+WHERE ([c].[CustomerID] = N'ALFKI') AND ([c].[CustomerID] = [ti.Customer].[CustomerID])
 ORDER BY [Id1], [Id2]");
         }
 
@@ -4765,8 +4771,9 @@ WHERE (
                 @"SELECT [c].[CustomerID], [c].[Address], [c].[City], [c].[CompanyName], [c].[ContactName], [c].[ContactTitle], [c].[Country], [c].[Fax], [c].[Phone], [c].[PostalCode], [c].[Region]
 FROM [Customers] AS [c]
 WHERE (
-    SELECT TOP(1) [o].[CustomerID]
+    SELECT TOP(1) [o.Customer].[CustomerID]
     FROM [Orders] AS [o]
+    LEFT JOIN [Customers] AS [o.Customer] ON [o].[CustomerID] = [o.Customer].[CustomerID]
     WHERE [c].[CustomerID] = [o].[CustomerID]
     ORDER BY [o].[OrderID]
 ) IS NULL");

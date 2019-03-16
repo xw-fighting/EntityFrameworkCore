@@ -313,41 +313,41 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             // Rewrite includes/navigations
 
-            var includeCompiler = new IncludeCompiler(QueryCompilationContext, _querySourceTracingExpressionVisitorFactory);
-            includeCompiler.CompileIncludes(queryModel, IsTrackingQuery(queryModel), asyncQuery, shouldThrow: false);
+            //var includeCompiler = new IncludeCompiler(QueryCompilationContext, _querySourceTracingExpressionVisitorFactory);
+            //includeCompiler.CompileIncludes(queryModel, IsTrackingQuery(queryModel), asyncQuery, shouldThrow: false);
 
-            queryModel.TransformExpressions(new CollectionNavigationSubqueryInjector(this).Visit);
-            queryModel.TransformExpressions(new CollectionNavigationSetOperatorSubqueryInjector(this).Visit);
+            //queryModel.TransformExpressions(new CollectionNavigationSubqueryInjector(this).Visit);
+            //queryModel.TransformExpressions(new CollectionNavigationSetOperatorSubqueryInjector(this).Visit);
 
             var navigationRewritingExpressionVisitor = _navigationRewritingExpressionVisitorFactory.Create(this);
-            navigationRewritingExpressionVisitor.InjectSubqueryToCollectionsInProjection(queryModel);
+            //navigationRewritingExpressionVisitor.InjectSubqueryToCollectionsInProjection(queryModel);
 
-            var correlatedCollectionFinder = new CorrelatedCollectionFindingExpressionVisitor(this, IsTrackingQuery(queryModel));
+            //var correlatedCollectionFinder = new CorrelatedCollectionFindingExpressionVisitor(this, IsTrackingQuery(queryModel));
 
-            if (!queryModel.ResultOperators.Any(r => r is GroupResultOperator))
-            {
-                queryModel.SelectClause.TransformExpressions(correlatedCollectionFinder.Visit);
-            }
+            //if (!queryModel.ResultOperators.Any(r => r is GroupResultOperator))
+            //{
+            //    queryModel.SelectClause.TransformExpressions(correlatedCollectionFinder.Visit);
+            //}
 
-            navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
+            //navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
 
-            includeCompiler.CompileIncludes(queryModel, IsTrackingQuery(queryModel), asyncQuery, shouldThrow: true);
+            //includeCompiler.CompileIncludes(queryModel, IsTrackingQuery(queryModel), asyncQuery, shouldThrow: true);
 
-            navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
+            //navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
 
-            new EntityQsreToKeyAccessConvertingQueryModelVisitor(QueryCompilationContext).VisitQueryModel(queryModel);
+            //new EntityQsreToKeyAccessConvertingQueryModelVisitor(QueryCompilationContext).VisitQueryModel(queryModel);
 
-            includeCompiler.RewriteCollectionQueries();
+            //includeCompiler.RewriteCollectionQueries();
 
-            includeCompiler.LogIgnoredIncludes();
+            //includeCompiler.LogIgnoredIncludes();
 
-            _modelExpressionApplyingExpressionVisitor.ApplyModelExpressions(queryModel);
+            //_modelExpressionApplyingExpressionVisitor.ApplyModelExpressions(queryModel);
 
             // Second pass of optimizations
 
             ExtractQueryAnnotations(queryModel);
 
-            navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
+            //navigationRewritingExpressionVisitor.Rewrite(queryModel, parentQueryModel: null);
 
             _queryOptimizer.Optimize(QueryCompilationContext, queryModel);
 

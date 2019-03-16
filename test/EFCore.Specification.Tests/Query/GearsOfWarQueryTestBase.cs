@@ -7351,6 +7351,15 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
+        [ConditionalTheory]
+        [MemberData(nameof(IsAsyncData))]
+        public virtual Task Where_contains_on_navigation_with_composite_keys(bool isAsync)
+        {
+            return AssertQuery<Gear, City>(
+                isAsync,
+                (gs, cs) => gs.Where(g => cs.Any(c => c.BornGears.Contains(g))));
+        }
+
         protected GearsOfWarContext CreateContext() => Fixture.CreateContext();
 
         protected virtual void ClearLog()
