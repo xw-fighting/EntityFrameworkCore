@@ -2701,8 +2701,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             return AssertQuery<Customer>(
                 isAsync,
-                cs => cs.OrderBy(c => true),
-                assertOrder: false,
+                cs => cs.OrderBy(c => true).Select(c => c),
                 entryCount: 91);
         }
 
@@ -2712,8 +2711,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             return AssertQuery<Customer>(
                 isAsync,
-                cs => cs.OrderBy(c => 3),
-                assertOrder: false,
+                cs => cs.OrderBy(c => 3).Select(c => c),
                 entryCount: 91);
         }
 
@@ -2724,8 +2722,7 @@ namespace Microsoft.EntityFrameworkCore.Query
             var param = 5;
             return AssertQuery<Customer>(
                 isAsync,
-                cs => cs.OrderBy(c => param),
-                assertOrder: false,
+                cs => cs.OrderBy(c => param).Select(c => c),
                 entryCount: 91);
         }
 
@@ -2834,8 +2831,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 cs => from c in cs
                       where c.CustomerID.StartsWith("A")
-                      orderby cs.Any(c2 => c2.CustomerID == c.CustomerID)
+                      orderby cs.Any(c2 => c2.CustomerID == c.CustomerID), c.CustomerID
                       select c,
+                assertOrder: true,
                 entryCount: 4);
         }
 
@@ -3022,7 +3020,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         {
             return AssertQuery<Employee>(
                 isAsync,
-                es => es.OrderBy(e => e.EmployeeID - e.EmployeeID),
+                es => es.OrderBy(e => e.EmployeeID - e.EmployeeID).Select(e => e),
                 entryCount: 9);
         }
 
@@ -3143,7 +3141,8 @@ namespace Microsoft.EntityFrameworkCore.Query
             return AssertQuery<Customer>(
                 isAsync,
                 customer => customer
-                    .OrderBy(c => c.Region ?? "ZZ"),
+                    .OrderBy(c => c.Region ?? "ZZ").ThenBy(c => c.CustomerID),
+                assertOrder: true,
                 entryCount: 91);
         }
 
@@ -3159,8 +3158,8 @@ namespace Microsoft.EntityFrameworkCore.Query
                         c.CustomerID,
                         c.CompanyName,
                         Region = c.Region ?? "ZZ"
-                    }).OrderBy(o => o.Region),
-                e => e.CustomerID);
+                    }).OrderBy(o => o.Region).ThenBy(o => o.CustomerID),
+                assertOrder: true);
         }
 
         [ConditionalTheory]
@@ -3173,8 +3172,9 @@ namespace Microsoft.EntityFrameworkCore.Query
                     // ReSharper disable once ConvertConditionalTernaryToNullCoalescing
                     // ReSharper disable once MergeConditionalExpression
 #pragma warning disable IDE0029 // Use coalesce expression
-                    .OrderBy(c => c.Region == null ? "ZZ" : c.Region),
+                    .OrderBy(c => c.Region == null ? "ZZ" : c.Region).ThenBy(c => c.CustomerID),
 #pragma warning restore IDE0029 // Use coalesce expression
+                assertOrder: true,
                 entryCount: 91);
         }
 
@@ -3186,7 +3186,8 @@ namespace Microsoft.EntityFrameworkCore.Query
             return AssertQuery<Customer>(
                 isAsync,
                 customer => customer
-                    .OrderBy(c => fakeCustomer.City == "London" ? "ZZ" : c.City),
+                    .OrderBy(c => fakeCustomer.City == "London" ? "ZZ" : c.City)
+                    .Select(c => c),
                 entryCount: 91);
         }
 
@@ -3198,7 +3199,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                 isAsync,
                 customer => customer
                     // ReSharper disable once ConvertConditionalTernaryToNullCoalescing
-                    .OrderBy(c => c.Region == "ASK"),
+                    .OrderBy(c => c.Region == "ASK").Select(c => c),
                 entryCount: 91);
         }
 
@@ -4704,7 +4705,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     {
                         c.CustomerID
                     }).Distinct().OrderBy(n => n.CustomerID),
-                e => e.CustomerID);
+                assertOrder: true);
         }
 
         [ConditionalTheory]
@@ -4750,7 +4751,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     {
                         A = c.CustomerID + c.City
                     }).Distinct().OrderBy(n => n.A),
-                e => e.A);
+                assertOrder: true);
         }
 
         [ConditionalTheory]
@@ -4782,7 +4783,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     {
                         A = c.CustomerID + c.City
                     }).OrderBy(n => n.A),
-                e => e.A);
+                assertOrder: true);
         }
 
         [ConditionalTheory]
@@ -4796,7 +4797,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     {
                         A = c.Orders.OrderByDescending(o => o.OrderID).FirstOrDefault().OrderDate
                     }).OrderBy(n => n.A),
-                e => e.A);
+                assertOrder: true);
         }
 
         protected class DTO<T>
@@ -5618,7 +5619,7 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             return AssertQuery<Customer>(
                 isAsync,
-                cs => cs.OrderBy(c => list.Contains(c.CustomerID)),
+                cs => cs.OrderBy(c => list.Contains(c.CustomerID)).Select(c => c),
                 entryCount: 91);
         }
 
@@ -5630,7 +5631,7 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             return AssertQuery<Customer>(
                 isAsync,
-                cs => cs.OrderBy(c => !list.Contains(c.CustomerID)),
+                cs => cs.OrderBy(c => !list.Contains(c.CustomerID)).Select(c => c),
                 entryCount: 91);
         }
 
