@@ -1394,6 +1394,13 @@ namespace Microsoft.EntityFrameworkCore.Query.Sql
             return isNullExpression;
         }
 
+        public Expression VisitNullable([NotNull] NullableExpression nullableExpression)
+        {
+            Visit(nullableExpression.Operand);
+
+            return nullableExpression;
+        }
+
         /// <summary>
         ///     Visits an IsNotNullExpression.
         /// </summary>
@@ -1822,11 +1829,24 @@ namespace Microsoft.EntityFrameworkCore.Query.Sql
 
                         if (parameterValue == null)
                         {
-                            return
-                                expression.NodeType == ExpressionType.Equal
+                            return expression.NodeType == ExpressionType.Equal
                                     ? (Expression)new IsNullExpression(nonParameterExpression)
                                     : Expression.Not(new IsNullExpression(nonParameterExpression));
                         }
+                    }
+                    else if (leftExpression is ConstantExpression constantLeftExpression
+                      && constantLeftExpression.Value == null)
+                    {
+                        return expression.NodeType == ExpressionType.Equal
+                                ? (Expression)new IsNullExpression(rightExpression)
+                                : Expression.Not(new IsNullExpression(rightExpression));
+                    }
+                    else if (rightExpression is ConstantExpression constantRightExpression
+                       && constantRightExpression.Value == null)
+                    {
+                        return expression.NodeType == ExpressionType.Equal
+                                ? (Expression)new IsNullExpression(leftExpression)
+                                : Expression.Not(new IsNullExpression(leftExpression));
                     }
                 }
 

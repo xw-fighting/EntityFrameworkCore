@@ -5,6 +5,7 @@ using System;
 using System.Linq.Expressions;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.EntityFrameworkCore.Query.Sql;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Query.Expressions
@@ -59,11 +60,23 @@ namespace Microsoft.EntityFrameworkCore.Query.Expressions
         }
 
         /// <summary>
+        ///     Dispatches to the specific visit method for this node type.
+        /// </summary>
+        protected override Expression Accept(ExpressionVisitor visitor)
+        {
+            Check.NotNull(visitor, nameof(visitor));
+
+            return visitor is ISqlExpressionVisitor specificVisitor
+                ? specificVisitor.VisitNullable(this)
+                : base.Accept(visitor);
+        }
+
+        /// <summary>
         ///     Indicates that the node can be reduced to a simpler node. If this returns true, Reduce() can be called to produce the reduced
         ///     form.
         /// </summary>
         /// <returns>True if the node can be reduced, otherwise false.</returns>
-        public override bool CanReduce => true;
+        public override bool CanReduce => Type == _operand.Type;
 
         /// <summary>
         ///     Reduces this node to a simpler expression. If CanReduce returns true, this should return a valid expression. This method can
